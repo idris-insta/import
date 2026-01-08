@@ -239,6 +239,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="User not found")
     return User(**user)
 
+# Add your routes to the router instead of directly to app
+@api_router.get("/")
+async def root():
+    return {"message": "ICMS API is running", "version": "1.0.0"}
+
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "ICMS API"}
+
 # Auth endpoints
 @api_router.post("/auth/register", response_model=User)
 async def register_user(user_data: UserCreate):
