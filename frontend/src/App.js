@@ -3,11 +3,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import axios from 'axios';
 import { Toaster } from 'sonner';
 import Login from './components/Auth/Login';
-import Dashboard from './components/Dashboard/Dashboard';
+import EnhancedDashboard from './components/Dashboard/EnhancedDashboard';
 import MasterData from './components/MasterData/MasterData';
 import ImportOrders from './components/ImportOrders/ImportOrders';
 import ActualLoading from './components/ActualLoading/ActualLoading';
-import Sidebar from './components/Layout/Sidebar';
+import FinancialDashboard from './components/Financial/FinancialDashboard';
+import DocumentVault from './components/DocumentVault/DocumentVault';
+import EnhancedSidebar from './components/Layout/EnhancedSidebar';
 import Header from './components/Layout/Header';
 import './App.css';
 
@@ -22,6 +24,22 @@ axios.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Response interceptor to handle 403 errors
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 403) {
+      // Don't redirect on permission errors, just let components handle it
+      return Promise.reject(error);
+    } else if (error.response?.status === 401) {
+      // Only redirect on auth errors
+      localStorage.removeItem('icms_token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 const ProtectedRoute = ({ children }) => {
   const token = localStorage.getItem('icms_token');
@@ -63,7 +81,7 @@ function App() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-lg font-medium text-gray-600">Loading...</div>
+        <div className="text-lg font-medium text-gray-600">Loading ICMS...</div>
       </div>
     );
   }
@@ -87,15 +105,17 @@ function App() {
             element={
               <ProtectedRoute>
                 <div className="flex h-screen bg-gray-50">
-                  <Sidebar user={user} />
+                  <EnhancedSidebar user={user} />
                   <div className="flex-1 flex flex-col overflow-hidden">
                     <Header user={user} onLogout={handleLogout} />
                     <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
                       <Routes>
-                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/" element={<EnhancedDashboard />} />
                         <Route path="/masters" element={<MasterData />} />
                         <Route path="/import-orders" element={<ImportOrders />} />
                         <Route path="/actual-loading" element={<ActualLoading />} />
+                        <Route path="/financial" element={<FinancialDashboard />} />
+                        <Route path="/documents" element={<DocumentVault />} />
                       </Routes>
                     </main>
                   </div>
