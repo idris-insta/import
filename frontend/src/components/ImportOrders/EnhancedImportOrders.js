@@ -432,22 +432,31 @@ const EnhancedImportOrders = () => {
 
   return (
     <div className="space-y-6 fade-in-up" data-testid="enhanced-import-orders-container">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Enhanced Import Orders</h1>
-          <p className="text-gray-600 mt-1">Comprehensive purchase order management with detailed product specifications</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Enhanced Import Orders</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Comprehensive purchase order management with detailed product specifications</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setDialogOpen(true); }} data-testid="create-order-btn">
-              <Plus className="w-4 h-4 mr-2" />
-              Create Order
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" data-testid="order-dialog">
-            <DialogHeader>
-              <DialogTitle>{isEditing ? 'Edit Import Order' : 'Create Import Order'}</DialogTitle>
-              <DialogDescription>Create a comprehensive purchase order with detailed product specifications</DialogDescription>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportOrders} data-testid="export-orders-btn">
+            <Download className="w-4 h-4 mr-1" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setUploadDialogOpen(true)} data-testid="import-orders-btn">
+            <Upload className="w-4 h-4 mr-1" />
+            Import
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { resetForm(); setDialogOpen(true); }} data-testid="create-order-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Order
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" data-testid="order-dialog">
+              <DialogHeader>
+                <DialogTitle>{isEditing ? 'Edit Import Order' : 'Create Import Order'}</DialogTitle>
+                <DialogDescription>Create a comprehensive purchase order with detailed product specifications</DialogDescription>
             </DialogHeader>
             <div className="grid gap-8 py-6">
               {/* Order Header */}
