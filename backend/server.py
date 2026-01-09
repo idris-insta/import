@@ -741,6 +741,142 @@ async def get_cash_flow_forecast(current_user: User = Depends(check_permission(P
         "forecast_period": 30
     }
 
+# Import Order endpoints
+@api_router.post("/import-orders", response_model=ImportOrder)
+async def create_import_order(order_data: ImportOrderCreate, current_user: User = Depends(check_permission(Permission.CREATE_ORDERS.value))):
+    # Get container specifications
+    container = await db.containers.find_one({"container_type": order_data.container_type}, {"_id": 0})
+    if not container:
+        raise HTTPException(status_code=400, detail="Container type not found")
+    
+    # Calculate totals
+    total_quantity = sum(item.quantity for item in order_data.items)
+    total_value = sum(item.total_value for item in order_data.items)
+    
+    # Calculate weight and CBM by fetching SKU data
+    total_weight = 0.0
+    total_cbm = 0.0
+    for item in order_data.items:
+        sku = await db.skus.find_one({"id": item.sku_id}, {"_id": 0})
+        if not sku:
+            raise HTTPException(status_code=400, detail=f"SKU {item.sku_id} not found")
+        total_weight += sku['weight_per_unit'] * item.quantity
+        total_cbm += sku['cbm_per_unit'] * item.quantity
+    
+    # Calculate utilization
+    weight_utilization = (total_weight / container['max_weight']) * 100
+    cbm_utilization = (total_cbm / container['max_cbm']) * 100
+    utilization_percentage = max(weight_utilization, cbm_utilization)
+    
+    # Calculate ETA if port is specified
+    eta = None
+    if order_data.port_id:
+        port = await db.ports.find_one({"id": order_data.port_id}, {"_id": 0})
+        if port:
+            eta = datetime.now(timezone.utc) + timedelta(days=port.get('transit_days', 30))
+    
+    order = ImportOrder(
+        **order_data.model_dump(),
+        total_quantity=total_quantity,
+        total_weight=total_weight,
+        total_cbm=total_cbm,
+        total_value=total_value,
+        utilization_percentage=utilization_percentage,
+        eta=eta,
+        created_by=current_user.id
+    )
+    
+    doc = order.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['updated_at'] = doc['updated_at'].isoformat()
+    if doc['eta']:
+        doc['eta'] = doc['eta'].isoformat()
+    
+    await db.import_orders.insert_one(doc)
+    return order
+
+@api_router.get("/import-orders", response_model=List[ImportOrder])
+async def get_import_orders(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(1000)
+    for order in orders:
+        if isinstance(order['created_at'], str):
+            order['created_at'] = datetime.fromisoformat(order['created_at'])
+        if isinstance(order['updated_at'], str):
+            order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+        if order.get('eta') and isinstance(order['eta'], str):
+            order['eta'] = datetime.fromisoformat(order['eta'])
+    return orders
+
+@api_router.get("/import-orders/{order_id}", response_model=ImportOrder)
+async def get_import_order(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    if isinstance(order['created_at'], str):
+        order['created_at'] = datetime.fromisoformat(order['created_at'])
+    if isinstance(order['updated_at'], str):
+        order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+    if order.get('eta') and isinstance(order['eta'], str):
+        order['eta'] = datetime.fromisoformat(order['eta'])
+    
+    return ImportOrder(**order)
+
+# Actual Loading endpoints
+@api_router.post("/actual-loadings", response_model=ActualLoading)
+async def create_actual_loading(loading_data: ActualLoadingCreate, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    # Calculate totals
+    total_planned_quantity = sum(item.planned_quantity for item in loading_data.items)
+    total_actual_quantity = sum(item.actual_quantity for item in loading_data.items)
+    total_variance_quantity = total_actual_quantity - total_planned_quantity
+    
+    total_planned_weight = sum(item.planned_weight for item in loading_data.items)
+    total_actual_weight = sum(item.actual_weight for item in loading_data.items)
+    total_variance_weight = total_actual_weight - total_planned_weight
+    
+    total_planned_value = sum(item.planned_value for item in loading_data.items)
+    total_actual_value = sum(item.actual_value for item in loading_data.items)
+    total_variance_value = total_actual_value - total_planned_value
+    
+    loading = ActualLoading(
+        **loading_data.model_dump(),
+        total_planned_quantity=total_planned_quantity,
+        total_actual_quantity=total_actual_quantity,
+        total_variance_quantity=total_variance_quantity,
+        total_planned_weight=total_planned_weight,
+        total_actual_weight=total_actual_weight,
+        total_variance_weight=total_variance_weight,
+        total_planned_value=total_planned_value,
+        total_actual_value=total_actual_value,
+        total_variance_value=total_variance_value,
+        created_by=current_user.id
+    )
+    
+    doc = loading.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    if doc.get('loading_date'):
+        doc['loading_date'] = doc['loading_date'].isoformat()
+    
+    await db.actual_loadings.insert_one(doc)
+    
+    # Update import order status to LOADED
+    await db.import_orders.update_one(
+        {"id": loading_data.import_order_id},
+        {"$set": {"status": OrderStatus.LOADED.value}}
+    )
+    
+    return loading
+
+@api_router.get("/actual-loadings", response_model=List[ActualLoading])
+async def get_actual_loadings(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    loadings = await db.actual_loadings.find({}, {"_id": 0}).to_list(1000)
+    for loading in loadings:
+        if isinstance(loading['created_at'], str):
+            loading['created_at'] = datetime.fromisoformat(loading['created_at'])
+        if loading.get('loading_date') and isinstance(loading['loading_date'], str):
+            loading['loading_date'] = datetime.fromisoformat(loading['loading_date'])
+    return loadings
+
 # Include the router
 app.include_router(api_router)
 
