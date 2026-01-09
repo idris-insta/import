@@ -28,6 +28,7 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 ├── backend/
 │   ├── server.py         # FastAPI app with all models and routes
 │   ├── requirements.txt
+│   ├── uploads/          # Document storage
 │   └── .env
 └── frontend/
     └── src/
@@ -45,7 +46,7 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 
 ## What's Been Implemented ✅
 
-### Phase 0: Foundation (Complete)
+### Phase 0: Foundation (COMPLETE ✅)
 - [x] JWT-based authentication with RBAC
 - [x] User roles: Owner, Logistics, Accounts, Purchase
 - [x] Role-based permissions system
@@ -55,66 +56,58 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - [x] Container Master with type, capacity, freight rates
 - [x] Full CRUD operations for all masters (Create, Read, Update, Delete)
 
-### Phase 1: Planning (Complete)
+### Phase 1: Planning (COMPLETE ✅)
 - [x] Import Order creation with detailed item specifications
 - [x] Container utilization calculation
 - [x] ETA calculation based on port transit days
 - [x] Support for multiple items per order
 - [x] PDF-format fields (thickness, size, liner/color, qty/carton, total rolls/cartons)
 
-### Dashboard (Complete)
-- [x] Overview tab with KPIs (Total Orders, Pipeline Value, Utilization, Suppliers)
-- [x] Orders by Status breakdown
-- [x] Container Utilization statistics
-- [x] Recent Orders display
-- [x] Financial, Logistics, Analytics, Alerts tabs (shell)
+### Phase 2: Execution (COMPLETE ✅)
+- [x] Actual Loading page with variance tracking
+- [x] Record Loading dialog to input actual quantities
+- [x] Variance calculation (Quantity, Weight, Value)
+- [x] Auto-update order status to "Loaded"
 
-## Issues Fixed This Session
-1. **EnhancedMasterData.js corrupted syntax** - File had escaped newlines and quotes, completely rewrote
-2. **Import Order creation failing** - Fixed duplicate `eta` parameter issue in backend
-3. **Ports and Containers not displaying** - Fixed by rewriting frontend component
+### Phase 3: Financials (COMPLETE ✅)
+- [x] Payment recording with multi-currency support (USD, EUR, CNY, INR)
+- [x] Automatic FX rate conversion
+- [x] FX Rates management (list, refresh)
+- [x] Financial Dashboard with 4 tabs (Overview, Payments, FX Rates, Analytics)
+- [x] Supplier balance updates on payment
+- [x] Payment history with reference tracking
+
+### Phase 4: Documents & Landed Costing (COMPLETE ✅)
+- [x] Document Vault with file upload
+- [x] Document types: Bill of Lading, Commercial Invoice, Packing List, Bill of Entry, Certificate
+- [x] Document linking to import orders
+- [x] Compliance status tracking (Complete/Partial/Incomplete)
+- [x] Landed Cost calculation API with hybrid allocation:
+  - Freight by CBM
+  - Duty by Value
+  - Port Charges by Weight
+
+### Phase 5: Intelligence Dashboard (COMPLETE ✅)
+- [x] KPI Summary API with comprehensive metrics
+- [x] Demurrage Clock tracking orders at port
+- [x] Pipeline Value calculation
+- [x] Container Utilization statistics
+- [x] FX Exposure breakdown by currency
+
+### Phase 6: ERP Integration (COMPLETE ✅)
+- [x] ERP Export endpoint (`/api/erp-export/{order_id}`)
+- [x] Clean JSON format with order, supplier, items, financials, logistics, compliance
 
 ## Test Results (January 2026)
-- Backend: 96% passing (25/26 tests)
-- Frontend: 100% working
-- Test file: `/app/tests/test_icms_backend.py`
+- **Backend: 52/52 tests passed (100%)**
+- **Frontend: 100% working**
+- Test files:
+  - `/app/tests/test_icms_backend.py` - Original CRUD tests
+  - `/app/tests/test_icms_phase3_5.py` - Phase 3-5 feature tests
 
 ## Test Credentials
 - **Email:** owner@icms.com
 - **Password:** owner123
-
-## Remaining Tasks (P0 - High Priority)
-
-### Phase 2: Execution Module
-- [ ] Actual Loading tracking
-- [ ] Variance Engine (planned vs actual)
-- [ ] Variance reports
-
-### Phase 3: Financials
-- [ ] Payment recording against orders
-- [ ] FX rate tracking per payment
-- [ ] Supplier ledger with multi-currency support
-
-### Phase 4: Document Vault
-- [ ] File upload functionality
-- [ ] Link documents to import orders
-- [ ] Document type categorization
-
-## Future Tasks (P1/P2)
-
-### Phase 4: Landed Costing
-- [ ] Hybrid cost allocation (Freight by CBM, Duty by Value, Port Charges by Weight)
-- [ ] Per-unit landed cost calculation
-
-### Phase 5: Intelligence
-- [ ] Real KPIs with live data
-- [ ] Demurrage Clock
-- [ ] Cash flow forecasting
-- [ ] FX gain/loss analysis
-
-### Phase 6: ERP Integration
-- [ ] JSON export endpoint for ERP systems
-- [ ] Multi-entity/warehouse support
 
 ## API Endpoints
 
@@ -129,14 +122,36 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - GET/POST/PUT/DELETE `/api/ports` - Port management
 - GET/POST/PUT/DELETE `/api/containers` - Container management
 
-### Orders
+### Orders & Loading
 - GET/POST `/api/import-orders` - Import order management
 - GET `/api/import-orders/{id}` - Get specific order
+- GET/POST `/api/actual-loadings` - Actual loading records
 
-### Dashboard
+### Payments
+- GET/POST `/api/payments` - Payment management
+- GET `/api/payments/by-order/{order_id}` - Payments for order
+- GET `/api/payments/by-supplier/{supplier_id}` - Payments for supplier
+- DELETE `/api/payments/{id}` - Delete payment
+
+### Documents
+- POST `/api/documents/upload` - Upload document
+- GET `/api/documents` - List all documents
+- GET `/api/documents/order/{order_id}` - Documents for order
+- GET `/api/documents/{id}` - Get specific document
+- DELETE `/api/documents/{id}` - Delete document
+
+### Dashboard & Intelligence
 - GET `/api/dashboard/stats` - Main stats
+- GET `/api/dashboard/kpi-summary` - Comprehensive KPIs
+- GET `/api/dashboard/demurrage-clock` - Demurrage tracking
+- GET `/api/dashboard/landed-cost/{order_id}` - Landed cost breakdown
 - GET `/api/dashboard/financial-overview` - Financial metrics
 - GET `/api/dashboard/logistics-overview` - Logistics metrics
+- GET `/api/erp-export/{order_id}` - ERP JSON export
+
+### FX Rates
+- GET `/api/fx-rates` - List FX rates
+- POST `/api/fx-rates/refresh` - Update FX rates
 
 ## Database Schema (MongoDB Collections)
 - `users` - User accounts with roles and permissions
@@ -145,7 +160,15 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - `ports` - Port details
 - `containers` - Container specifications
 - `import_orders` - Purchase orders
+- `actual_loadings` - Actual loading records
+- `payments` - Payment records
+- `documents` - Document metadata
 - `fx_rates` - Currency exchange rates
 
-## Known Issues
-- Intermittent 520 errors when fetching order details (transient network issue)
+## Future Enhancements (Backlog)
+- [ ] Real-time ExchangeRate-API integration (currently using stored rates)
+- [ ] Multi-entity/warehouse support
+- [ ] Advanced analytics and reporting
+- [ ] Email notifications for demurrage alerts
+- [ ] Batch document upload
+- [ ] Mobile-responsive optimization
