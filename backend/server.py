@@ -610,7 +610,7 @@ async def get_fx_rates(current_user: User = Depends(check_permission(Permission.
     return rates
 
 @api_router.post("/fx-rates/refresh")
-async def refresh_fx_rates(current_user: User = Depends(check_permission(Permission.SYSTEM_ADMIN.value))):
+async def refresh_fx_rates(current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))):
     success = await fetch_fx_rates()
     if success:
         return {"message": "FX rates updated successfully"}
