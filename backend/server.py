@@ -1000,22 +1000,26 @@ async def import_master_from_excel(
         "skus": {
             "required": ["sku_code", "description", "hsn_code", "weight_per_unit", "cbm_per_unit"],
             "unique_key": "sku_code",
-            "numeric_fields": ["micron", "width_mm", "length_m", "weight_per_unit", "cbm_per_unit", "unit_cost"]
+            "numeric_fields": ["micron", "width_mm", "length_m", "weight_per_unit", "cbm_per_unit", "unit_cost"],
+            "string_fields": ["sku_code", "description", "color", "hsn_code", "category"]
         },
         "suppliers": {
             "required": ["code", "name", "base_currency", "contact_email", "contact_phone", "address"],
             "unique_key": "code",
-            "numeric_fields": ["opening_balance"]
+            "numeric_fields": ["opening_balance"],
+            "string_fields": ["code", "name", "base_currency", "country", "contact_email", "contact_phone", "address", "description"]
         },
         "ports": {
             "required": ["code", "name", "country"],
             "unique_key": "code",
-            "numeric_fields": ["transit_days", "demurrage_free_days", "demurrage_rate"]
+            "numeric_fields": ["transit_days", "demurrage_free_days", "demurrage_rate"],
+            "string_fields": ["code", "name", "country"]
         },
         "containers": {
             "required": ["container_type", "max_weight", "max_cbm"],
             "unique_key": "container_type",
-            "numeric_fields": ["max_weight", "max_cbm", "freight_rate"]
+            "numeric_fields": ["max_weight", "max_cbm", "freight_rate"],
+            "string_fields": ["container_type"]
         }
     }
     
