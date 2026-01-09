@@ -1172,6 +1172,464 @@ async def get_actual_loadings(current_user: User = Depends(check_permission(Perm
             loading['loading_date'] = datetime.fromisoformat(loading['loading_date'])
     return loadings
 
+# ==================== PAYMENT ENDPOINTS ====================
+
+@api_router.post("/payments", response_model=Payment)
+async def create_payment(payment_data: PaymentCreate, current_user: User = Depends(check_permission(Permission.MANAGE_PAYMENTS.value))):
+    # Get the import order to find supplier_id
+    order = await db.import_orders.find_one({"id": payment_data.import_order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Get current FX rate
+    fx_rate = await db.fx_rates.find_one(
+        {"from_currency": payment_data.currency.value, "to_currency": "INR"},
+        {"_id": 0}
+    )
+    current_fx_rate = fx_rate['rate'] if fx_rate else 1.0
+    
+    # Calculate INR amount
+    inr_amount = payment_data.amount * current_fx_rate
+    
+    payment = Payment(
+        import_order_id=payment_data.import_order_id,
+        supplier_id=order['supplier_id'],
+        amount=payment_data.amount,
+        currency=payment_data.currency,
+        fx_rate=current_fx_rate,
+        inr_amount=inr_amount,
+        payment_date=payment_data.payment_date,
+        reference=payment_data.reference,
+        status=PaymentStatus.PAID,
+        created_by=current_user.id
+    )
+    
+    doc = payment.model_dump()
+    doc['currency'] = doc['currency'].value if hasattr(doc['currency'], 'value') else doc['currency']
+    doc['status'] = doc['status'].value if hasattr(doc['status'], 'value') else doc['status']
+    doc['created_at'] = doc['created_at'].isoformat()
+    doc['payment_date'] = doc['payment_date'].isoformat()
+    
+    await db.payments.insert_one(doc)
+    
+    # Update supplier balance
+    await db.suppliers.update_one(
+        {"id": order['supplier_id']},
+        {"$inc": {"current_balance": -payment_data.amount}}
+    )
+    
+    return payment
+
+@api_router.get("/payments", response_model=List[Payment])
+async def get_payments(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    payments = await db.payments.find({}, {"_id": 0}).to_list(1000)
+    for payment in payments:
+        if isinstance(payment['created_at'], str):
+            payment['created_at'] = datetime.fromisoformat(payment['created_at'])
+        if isinstance(payment['payment_date'], str):
+            payment['payment_date'] = datetime.fromisoformat(payment['payment_date'])
+    return payments
+
+@api_router.get("/payments/by-order/{order_id}", response_model=List[Payment])
+async def get_payments_by_order(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    payments = await db.payments.find({"import_order_id": order_id}, {"_id": 0}).to_list(1000)
+    for payment in payments:
+        if isinstance(payment['created_at'], str):
+            payment['created_at'] = datetime.fromisoformat(payment['created_at'])
+        if isinstance(payment['payment_date'], str):
+            payment['payment_date'] = datetime.fromisoformat(payment['payment_date'])
+    return payments
+
+@api_router.get("/payments/by-supplier/{supplier_id}", response_model=List[Payment])
+async def get_payments_by_supplier(supplier_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    payments = await db.payments.find({"supplier_id": supplier_id}, {"_id": 0}).to_list(1000)
+    for payment in payments:
+        if isinstance(payment['created_at'], str):
+            payment['created_at'] = datetime.fromisoformat(payment['created_at'])
+        if isinstance(payment['payment_date'], str):
+            payment['payment_date'] = datetime.fromisoformat(payment['payment_date'])
+    return payments
+
+@api_router.delete("/payments/{payment_id}")
+async def delete_payment(payment_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_PAYMENTS.value))):
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Restore supplier balance
+    await db.suppliers.update_one(
+        {"id": payment['supplier_id']},
+        {"$inc": {"current_balance": payment['amount']}}
+    )
+    
+    result = await db.payments.delete_one({"id": payment_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    return {"message": "Payment deleted successfully"}
+
+# ==================== DOCUMENT ENDPOINTS ====================
+
+@api_router.post("/documents/upload", response_model=Document)
+async def upload_document(
+    file: UploadFile = File(...),
+    import_order_id: str = None,
+    document_type: str = None,
+    notes: str = None,
+    current_user: User = Depends(check_permission(Permission.MANAGE_DOCUMENTS.value))
+):
+    # Validate order exists
+    order = await db.import_orders.find_one({"id": import_order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Validate document type
+    try:
+        doc_type = DocumentType(document_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid document type. Must be one of: {[e.value for e in DocumentType]}")
+    
+    # Generate unique filename
+    file_ext = Path(file.filename).suffix
+    unique_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = UPLOADS_DIR / unique_filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Get file size
+    file_size = file_path.stat().st_size
+    
+    document = Document(
+        import_order_id=import_order_id,
+        document_type=doc_type,
+        filename=unique_filename,
+        original_filename=file.filename,
+        file_path=str(file_path),
+        file_size=file_size,
+        uploaded_by=current_user.id,
+        notes=notes
+    )
+    
+    doc = document.model_dump()
+    doc['document_type'] = doc['document_type'].value if hasattr(doc['document_type'], 'value') else doc['document_type']
+    doc['uploaded_at'] = doc['uploaded_at'].isoformat()
+    
+    await db.documents.insert_one(doc)
+    
+    return document
+
+@api_router.get("/documents", response_model=List[Document])
+async def get_all_documents(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    documents = await db.documents.find({}, {"_id": 0}).to_list(1000)
+    for doc in documents:
+        if isinstance(doc['uploaded_at'], str):
+            doc['uploaded_at'] = datetime.fromisoformat(doc['uploaded_at'])
+    return documents
+
+@api_router.get("/documents/order/{order_id}", response_model=List[Document])
+async def get_documents_by_order(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    documents = await db.documents.find({"import_order_id": order_id}, {"_id": 0}).to_list(1000)
+    for doc in documents:
+        if isinstance(doc['uploaded_at'], str):
+            doc['uploaded_at'] = datetime.fromisoformat(doc['uploaded_at'])
+    return documents
+
+@api_router.get("/documents/{document_id}", response_model=Document)
+async def get_document(document_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    document = await db.documents.find_one({"id": document_id}, {"_id": 0})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if isinstance(document['uploaded_at'], str):
+        document['uploaded_at'] = datetime.fromisoformat(document['uploaded_at'])
+    return Document(**document)
+
+@api_router.delete("/documents/{document_id}")
+async def delete_document(document_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_DOCUMENTS.value))):
+    document = await db.documents.find_one({"id": document_id}, {"_id": 0})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Delete file from disk
+    file_path = Path(document['file_path'])
+    if file_path.exists():
+        file_path.unlink()
+    
+    result = await db.documents.delete_one({"id": document_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "Document deleted successfully"}
+
+# ==================== ENHANCED DASHBOARD ENDPOINTS ====================
+
+@api_router.get("/dashboard/demurrage-clock")
+async def get_demurrage_clock(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    """Get demurrage status for all orders in transit or at port"""
+    orders = await db.import_orders.find(
+        {"status": {"$in": ["Shipped", "Arrived"]}},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    demurrage_items = []
+    for order in orders:
+        if order.get('eta'):
+            eta = datetime.fromisoformat(order['eta']) if isinstance(order['eta'], str) else order['eta']
+            
+            # Get port demurrage settings
+            port = await db.ports.find_one({"id": order.get('port_id')}, {"_id": 0})
+            free_days = port.get('demurrage_free_days', 7) if port else 7
+            rate = port.get('demurrage_rate', 50.0) if port else 50.0
+            
+            days_since_arrival = (datetime.now(timezone.utc) - eta).days
+            demurrage_days = max(0, days_since_arrival - free_days)
+            demurrage_cost = demurrage_days * rate
+            
+            demurrage_items.append({
+                "po_number": order['po_number'],
+                "eta": eta.isoformat(),
+                "days_since_arrival": days_since_arrival,
+                "free_days": free_days,
+                "demurrage_days": demurrage_days,
+                "daily_rate": rate,
+                "total_demurrage": demurrage_cost,
+                "status": "Accruing" if demurrage_days > 0 else "Free Period"
+            })
+    
+    return {
+        "items": demurrage_items,
+        "total_demurrage": sum(item['total_demurrage'] for item in demurrage_items),
+        "orders_with_demurrage": len([i for i in demurrage_items if i['demurrage_days'] > 0])
+    }
+
+@api_router.get("/dashboard/landed-cost/{order_id}")
+async def get_landed_cost(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    """Calculate landed cost breakdown for an order"""
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Get container details for freight allocation
+    container = await db.containers.find_one({"container_type": order.get('container_type')}, {"_id": 0})
+    
+    # Calculate cost components
+    goods_value = order.get('total_value', 0)
+    freight = order.get('freight_charges', 0)
+    insurance = order.get('insurance_charges', 0)
+    duty_rate = order.get('duty_rate', 0.1)
+    other_charges = order.get('other_charges', 0)
+    
+    # CIF value
+    cif_value = goods_value + freight + insurance
+    
+    # Duty calculation
+    duty_amount = cif_value * duty_rate
+    
+    # Total landed cost
+    total_landed_cost = cif_value + duty_amount + other_charges
+    
+    # Per-unit cost (if quantity available)
+    total_quantity = order.get('total_quantity', 1)
+    per_unit_cost = total_landed_cost / total_quantity if total_quantity > 0 else 0
+    
+    # Cost breakdown by type (hybrid allocation)
+    # Freight by CBM, Duty by Value, Port Charges by Weight
+    items_breakdown = []
+    for item in order.get('items', []):
+        sku = await db.skus.find_one({"id": item.get('sku_id')}, {"_id": 0})
+        if sku:
+            item_cbm = sku.get('cbm_per_unit', 0) * item.get('quantity', 0)
+            item_weight = sku.get('weight_per_unit', 0) * item.get('quantity', 0)
+            item_value = item.get('total_value', 0)
+            
+            # Allocation ratios
+            total_cbm = order.get('total_cbm', 1)
+            total_weight = order.get('total_weight', 1)
+            total_value_ratio = item_value / goods_value if goods_value > 0 else 0
+            cbm_ratio = item_cbm / total_cbm if total_cbm > 0 else 0
+            weight_ratio = item_weight / total_weight if total_weight > 0 else 0
+            
+            items_breakdown.append({
+                "sku_code": sku.get('sku_code'),
+                "quantity": item.get('quantity'),
+                "goods_value": item_value,
+                "freight_allocated": freight * cbm_ratio,
+                "duty_allocated": duty_amount * total_value_ratio,
+                "other_allocated": other_charges * weight_ratio,
+                "total_cost": item_value + (freight * cbm_ratio) + (duty_amount * total_value_ratio) + (other_charges * weight_ratio),
+                "per_unit_cost": (item_value + (freight * cbm_ratio) + (duty_amount * total_value_ratio) + (other_charges * weight_ratio)) / item.get('quantity', 1)
+            })
+    
+    return {
+        "order_id": order_id,
+        "po_number": order.get('po_number'),
+        "cost_summary": {
+            "goods_value": goods_value,
+            "freight": freight,
+            "insurance": insurance,
+            "cif_value": cif_value,
+            "duty_rate": duty_rate,
+            "duty_amount": duty_amount,
+            "other_charges": other_charges,
+            "total_landed_cost": total_landed_cost,
+            "per_unit_cost": per_unit_cost
+        },
+        "items_breakdown": items_breakdown
+    }
+
+@api_router.get("/dashboard/kpi-summary")
+async def get_kpi_summary(current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    """Get comprehensive KPI summary for the owner's dashboard"""
+    
+    # Orders metrics
+    total_orders = await db.import_orders.count_documents({})
+    orders_by_status = {}
+    for status in OrderStatus:
+        count = await db.import_orders.count_documents({"status": status.value})
+        if count > 0:
+            orders_by_status[status.value] = count
+    
+    # Pipeline value (orders not yet delivered)
+    pipeline_orders = await db.import_orders.find(
+        {"status": {"$nin": ["Delivered", "Cancelled"]}},
+        {"_id": 0, "total_value": 1, "currency": 1}
+    ).to_list(1000)
+    pipeline_value = sum(o.get('total_value', 0) for o in pipeline_orders)
+    
+    # Container utilization
+    orders_with_util = await db.import_orders.find(
+        {"utilization_percentage": {"$exists": True}},
+        {"_id": 0, "utilization_percentage": 1}
+    ).to_list(1000)
+    avg_utilization = sum(o.get('utilization_percentage', 0) for o in orders_with_util) / len(orders_with_util) if orders_with_util else 0
+    
+    # Supplier metrics
+    suppliers = await db.suppliers.find({}, {"_id": 0, "current_balance": 1, "base_currency": 1}).to_list(1000)
+    total_payables = sum(s.get('current_balance', 0) for s in suppliers)
+    
+    # FX exposure
+    orders = await db.import_orders.find({"status": {"$nin": ["Delivered", "Cancelled"]}}, {"_id": 0}).to_list(1000)
+    fx_exposure = {}
+    for order in orders:
+        currency = order.get('currency', 'USD')
+        if currency not in fx_exposure:
+            fx_exposure[currency] = {"total_value": 0, "order_count": 0}
+        fx_exposure[currency]['total_value'] += order.get('total_value', 0)
+        fx_exposure[currency]['order_count'] += 1
+    
+    # Variance metrics
+    loadings = await db.actual_loadings.find({}, {"_id": 0}).to_list(1000)
+    total_variance_value = sum(l.get('total_variance_value', 0) for l in loadings)
+    
+    # Payment metrics
+    payments = await db.payments.find({}, {"_id": 0}).to_list(1000)
+    total_payments = sum(p.get('inr_amount', 0) for p in payments)
+    
+    return {
+        "orders": {
+            "total": total_orders,
+            "by_status": orders_by_status,
+            "pipeline_value": pipeline_value
+        },
+        "container": {
+            "avg_utilization": round(avg_utilization, 1)
+        },
+        "financial": {
+            "total_payables": total_payables,
+            "total_payments": total_payments,
+            "fx_exposure": fx_exposure,
+            "variance_impact": total_variance_value
+        },
+        "suppliers": {
+            "total": len(suppliers),
+            "with_balance": len([s for s in suppliers if s.get('current_balance', 0) > 0])
+        }
+    }
+
+# ==================== ERP EXPORT ENDPOINT ====================
+
+@api_router.get("/erp-export/{order_id}")
+async def export_order_for_erp(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    """Generate clean JSON export for ERP integration"""
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    # Get related data
+    supplier = await db.suppliers.find_one({"id": order.get('supplier_id')}, {"_id": 0})
+    payments = await db.payments.find({"import_order_id": order_id}, {"_id": 0}).to_list(1000)
+    documents = await db.documents.find({"import_order_id": order_id}, {"_id": 0}).to_list(1000)
+    loading = await db.actual_loadings.find_one({"import_order_id": order_id}, {"_id": 0})
+    
+    # Get SKU details for items
+    items_with_sku = []
+    for item in order.get('items', []):
+        sku = await db.skus.find_one({"id": item.get('sku_id')}, {"_id": 0})
+        items_with_sku.append({
+            "sku_code": sku.get('sku_code') if sku else 'N/A',
+            "description": sku.get('description') if sku else item.get('item_description'),
+            "hsn_code": sku.get('hsn_code') if sku else '',
+            "quantity": item.get('quantity'),
+            "unit_price": item.get('unit_price'),
+            "total_value": item.get('total_value'),
+            "actual_quantity": None,
+            "variance": None
+        })
+    
+    # Add actual loading data if available
+    if loading:
+        for i, item in enumerate(items_with_sku):
+            if i < len(loading.get('items', [])):
+                load_item = loading['items'][i]
+                item['actual_quantity'] = load_item.get('actual_quantity')
+                item['variance'] = load_item.get('variance_quantity')
+    
+    # Calculate landed cost
+    landed_cost_response = await get_landed_cost(order_id, current_user)
+    
+    return {
+        "export_type": "ICMS_ERP_EXPORT",
+        "export_version": "1.0",
+        "export_date": datetime.now(timezone.utc).isoformat(),
+        "order": {
+            "po_number": order.get('po_number'),
+            "status": order.get('status'),
+            "container_type": order.get('container_type'),
+            "currency": order.get('currency'),
+            "created_at": order.get('created_at'),
+            "eta": order.get('eta')
+        },
+        "supplier": {
+            "name": supplier.get('name') if supplier else 'N/A',
+            "code": supplier.get('code') if supplier else 'N/A',
+            "currency": supplier.get('base_currency') if supplier else 'N/A'
+        },
+        "items": items_with_sku,
+        "financials": {
+            "total_value": order.get('total_value'),
+            "landed_cost": landed_cost_response.get('cost_summary'),
+            "payments": [{
+                "reference": p.get('reference'),
+                "amount": p.get('amount'),
+                "currency": p.get('currency'),
+                "fx_rate": p.get('fx_rate'),
+                "inr_amount": p.get('inr_amount'),
+                "date": p.get('payment_date')
+            } for p in payments]
+        },
+        "logistics": {
+            "total_weight": order.get('total_weight'),
+            "total_cbm": order.get('total_cbm'),
+            "utilization_percentage": order.get('utilization_percentage')
+        },
+        "compliance": {
+            "documents": [{
+                "type": d.get('document_type'),
+                "filename": d.get('original_filename'),
+                "uploaded_at": d.get('uploaded_at')
+            } for d in documents]
+        }
+    }
+
 # Include the router
 app.include_router(api_router)
 
