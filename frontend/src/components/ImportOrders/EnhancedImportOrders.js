@@ -7,9 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
-import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
-import { Plus, Package, AlertTriangle, CheckCircle, Clock, Eye, Loader2, Edit, Trash2, Calculator, Download, Upload, FileSpreadsheet, FileText } from 'lucide-react';
+import { Plus, Package, Eye, Loader2, Download, Upload, FileSpreadsheet, FileText, X } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -19,12 +18,10 @@ const EnhancedImportOrders = () => {
   const [skus, setSkus] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [containers, setContainers] = useState([]);
-  const [ports, setPorts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -32,34 +29,24 @@ const EnhancedImportOrders = () => {
   const [orderForm, setOrderForm] = useState({
     po_number: '',
     supplier_id: '',
-    port_id: '',
-    container_type: '',
+    container_type: '20FT',
     currency: 'USD',
     items: [],
-    eta: '',
     duty_rate: '0.1',
-    freight_charges: '',
-    insurance_charges: '',
-    other_charges: ''
+    freight_charges: '0',
+    insurance_charges: '0',
+    other_charges: '0'
   });
   
   const [currentItem, setCurrentItem] = useState({
     sku_id: '',
+    quantity: '',
+    unit_price: '',
+    total_value: '',
     item_description: '',
     thickness: '',
     size: '',
-    liner_color: '',
-    quantity: '',
-    qty_per_carton: '',
-    total_cartons: '',
-    total_rolls: '',
-    unit_price: '',
-    price_per_sqm: '',
-    total_value: '',
-    kg_per_package: '',
-    total_kg: '',
-    code: '',
-    marking: ''
+    liner_color: ''
   });
 
   useEffect(() => {
@@ -69,19 +56,17 @@ const EnhancedImportOrders = () => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [ordersRes, skusRes, suppliersRes, containersRes, portsRes] = await Promise.all([
+      const [ordersRes, skusRes, suppliersRes, containersRes] = await Promise.all([
         axios.get(`${API}/import-orders`),
         axios.get(`${API}/skus`),
         axios.get(`${API}/suppliers`),
-        axios.get(`${API}/containers`),
-        axios.get(`${API}/ports`)
+        axios.get(`${API}/containers`)
       ]);
       
       setOrders(ordersRes.data);
       setSkus(skusRes.data);
       setSuppliers(suppliersRes.data);
       setContainers(containersRes.data);
-      setPorts(portsRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);
       toast.error('Failed to load data');
@@ -90,99 +75,65 @@ const EnhancedImportOrders = () => {
     }
   };
 
-  const calculateItemTotal = () => {
-    const quantity = parseFloat(currentItem.quantity) || 0;
-    const unitPrice = parseFloat(currentItem.unit_price) || 0;
-    const total = quantity * unitPrice;
-    setCurrentItem({ ...currentItem, total_value: total.toString() });
-  };
-
   const handleAddItem = () => {
     if (!currentItem.sku_id || !currentItem.quantity || !currentItem.unit_price) {
-      toast.error('Please fill required item fields: SKU, Quantity, and Unit Price');
+      toast.error('Please fill SKU, quantity and unit price');
       return;
     }
     
-    const quantity = parseInt(currentItem.quantity);
-    const unitPrice = parseFloat(currentItem.unit_price);
+    const quantity = parseFloat(currentItem.quantity) || 0;
+    const unitPrice = parseFloat(currentItem.unit_price) || 0;
     const totalValue = quantity * unitPrice;
     
     const newItem = {
       ...currentItem,
       quantity,
       unit_price: unitPrice,
-      total_value: totalValue,
-      qty_per_carton: currentItem.qty_per_carton ? parseInt(currentItem.qty_per_carton) : null,
-      total_cartons: currentItem.total_cartons ? parseInt(currentItem.total_cartons) : null,
-      total_rolls: currentItem.total_rolls ? parseInt(currentItem.total_rolls) : null,
-      price_per_sqm: currentItem.price_per_sqm ? parseFloat(currentItem.price_per_sqm) : null,
-      kg_per_package: currentItem.kg_per_package ? parseFloat(currentItem.kg_per_package) : null,
-      total_kg: currentItem.total_kg ? parseFloat(currentItem.total_kg) : null
+      total_value: totalValue
     };
     
-    setOrderForm({
-      ...orderForm,
-      items: [...orderForm.items, newItem]
-    });
-    
-    // Reset current item form
+    setOrderForm({ ...orderForm, items: [...orderForm.items, newItem] });
     setCurrentItem({
       sku_id: '',
+      quantity: '',
+      unit_price: '',
+      total_value: '',
       item_description: '',
       thickness: '',
       size: '',
-      liner_color: '',
-      quantity: '',
-      qty_per_carton: '',
-      total_cartons: '',
-      total_rolls: '',
-      unit_price: '',
-      price_per_sqm: '',
-      total_value: '',
-      kg_per_package: '',
-      total_kg: '',
-      code: '',
-      marking: ''
+      liner_color: ''
     });
+    toast.success('Item added');
   };
 
   const handleRemoveItem = (index) => {
-    const updatedItems = orderForm.items.filter((_, i) => i !== index);
-    setOrderForm({ ...orderForm, items: updatedItems });
+    const newItems = orderForm.items.filter((_, i) => i !== index);
+    setOrderForm({ ...orderForm, items: newItems });
   };
 
   const handleCreateOrder = async () => {
-    if (!orderForm.po_number || !orderForm.supplier_id || !orderForm.container_type || orderForm.items.length === 0) {
-      toast.error('Please fill all required fields and add at least one item');
+    if (!orderForm.po_number || !orderForm.supplier_id || orderForm.items.length === 0) {
+      toast.error('Please fill PO number, supplier, and add at least one item');
       return;
     }
     
     try {
       const payload = {
         ...orderForm,
-        eta: orderForm.eta ? new Date(orderForm.eta).toISOString() : null,
-        duty_rate: parseFloat(orderForm.duty_rate),
+        duty_rate: parseFloat(orderForm.duty_rate) || 0.1,
         freight_charges: parseFloat(orderForm.freight_charges) || 0,
         insurance_charges: parseFloat(orderForm.insurance_charges) || 0,
         other_charges: parseFloat(orderForm.other_charges) || 0
       };
       
-      let response;
-      if (isEditing) {
-        response = await axios.put(`${API}/import-orders/${selectedOrder.id}`, payload);
-        setOrders(orders.map(order => order.id === selectedOrder.id ? response.data : order));
-        toast.success('Import order updated successfully');
-      } else {
-        response = await axios.post(`${API}/import-orders`, payload);
-        setOrders([...orders, response.data]);
-        toast.success('Import order created successfully');
-      }
-      
-      resetForm();
+      await axios.post(`${API}/import-orders`, payload);
+      toast.success('Order created successfully');
       setDialogOpen(false);
+      resetForm();
+      await fetchAllData();
     } catch (error) {
-      console.error('Error with order:', error);
-      toast.error(error.response?.data?.detail || 'Failed to save order');
+      console.error('Error creating order:', error);
+      toast.error(error.response?.data?.detail || 'Failed to create order');
     }
   };
 
@@ -190,58 +141,14 @@ const EnhancedImportOrders = () => {
     setOrderForm({
       po_number: '',
       supplier_id: '',
-      port_id: '',
-      container_type: '',
+      container_type: '20FT',
       currency: 'USD',
       items: [],
-      eta: '',
       duty_rate: '0.1',
-      freight_charges: '',
-      insurance_charges: '',
-      other_charges: ''
+      freight_charges: '0',
+      insurance_charges: '0',
+      other_charges: '0'
     });
-    setCurrentItem({
-      sku_id: '',
-      item_description: '',
-      thickness: '',
-      size: '',
-      liner_color: '',
-      quantity: '',
-      qty_per_carton: '',
-      total_cartons: '',
-      total_rolls: '',
-      unit_price: '',
-      price_per_sqm: '',
-      total_value: '',
-      kg_per_package: '',
-      total_kg: '',
-      code: '',
-      marking: ''
-    });
-    setIsEditing(false);
-    setSelectedOrder(null);
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'Draft': 'bg-gray-100 text-gray-800',
-      'Tentative': 'bg-blue-100 text-blue-800',
-      'Confirmed': 'bg-green-100 text-green-800',
-      'Loaded': 'bg-purple-100 text-purple-800',
-      'Shipped': 'bg-orange-100 text-orange-800',
-      'In Transit': 'bg-yellow-100 text-yellow-800',
-      'Arrived': 'bg-red-100 text-red-800',
-      'Customs Clearance': 'bg-pink-100 text-pink-800',
-      'Cleared': 'bg-emerald-100 text-emerald-800',
-      'Delivered': 'bg-green-200 text-green-900'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getUtilizationColor = (utilization) => {
-    if (utilization >= 90) return 'bg-green-500';
-    if (utilization >= 70) return 'bg-yellow-500';
-    return 'bg-red-500';
   };
 
   const handleViewOrder = async (orderId) => {
@@ -255,14 +162,10 @@ const EnhancedImportOrders = () => {
     }
   };
 
-  // Excel Export/Import and PDF Functions
   const handleExportOrders = async () => {
     try {
       toast.info('Generating Excel export...');
-      const response = await axios.get(`${API}/import-orders/export`, {
-        responseType: 'blob'
-      });
-      
+      const response = await axios.get(`${API}/import-orders/export`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -271,7 +174,6 @@ const EnhancedImportOrders = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
       toast.success('Orders exported successfully');
     } catch (error) {
       console.error('Export error:', error);
@@ -281,10 +183,7 @@ const EnhancedImportOrders = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await axios.get(`${API}/import-orders/template`, {
-        responseType: 'blob'
-      });
-      
+      const response = await axios.get(`${API}/import-orders/template`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -293,7 +192,6 @@ const EnhancedImportOrders = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
       toast.success('Template downloaded');
     } catch (error) {
       console.error('Template download error:', error);
@@ -304,51 +202,37 @@ const EnhancedImportOrders = () => {
   const handleImportOrders = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
       toast.error('Please select an Excel file (.xlsx or .xls)');
       return;
     }
-
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-
     try {
       const response = await axios.post(`${API}/import-orders/import`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
       const stats = response.data.statistics;
-      toast.success(
-        `Import completed! Created: ${stats.created}, Skipped: ${stats.skipped}`
-      );
-      
+      toast.success(`Import completed! Created: ${stats.created}, Skipped: ${stats.skipped}`);
       if (stats.errors?.length > 0) {
-        console.warn('Import errors:', stats.errors);
         toast.warning(`${stats.errors.length} POs had errors`);
       }
-      
-      await fetchOrders();
+      await fetchAllData();
       setUploadDialogOpen(false);
     } catch (error) {
       console.error('Import error:', error);
       toast.error(error.response?.data?.detail || 'Failed to import orders');
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
   const handleExportPDF = async (orderId) => {
     try {
       toast.info('Generating PDF...');
-      const response = await axios.get(`${API}/import-orders/${orderId}/pdf`, {
-        responseType: 'blob'
-      });
-      
+      const response = await axios.get(`${API}/import-orders/${orderId}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -358,7 +242,6 @@ const EnhancedImportOrders = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
       toast.success('PDF generated successfully');
     } catch (error) {
       console.error('PDF export error:', error);
@@ -366,60 +249,20 @@ const EnhancedImportOrders = () => {
     }
   };
 
-  const renderUploadDialog = () => (
-    <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-      <DialogContent className="max-w-md" data-testid="po-import-dialog">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileSpreadsheet className="w-5 h-5" />
-            Import Purchase Orders from Excel
-          </DialogTitle>
-          <DialogDescription>
-            Upload an Excel file to create multiple POs at once
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Excel File</Label>
-            <Input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImportOrders}
-              disabled={uploading}
-              data-testid="po-import-file-input"
-            />
-            <p className="text-xs text-gray-500">
-              Each row = one item. Multiple rows with same PO number = one PO with multiple items.
-            </p>
-          </div>
-          
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <span className="text-sm text-gray-600">Need a template?</span>
-            <Button
-              variant="link"
-              size="sm"
-              onClick={handleDownloadTemplate}
-              data-testid="download-po-template-btn"
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-1" />
-              Download Template
-            </Button>
-          </div>
-          
-          <div className="text-xs text-gray-500 space-y-1">
-            <p><strong>Required columns:</strong> po_number, supplier_code, sku_code, quantity, unit_price</p>
-            <p><strong>Note:</strong> supplier_code and sku_code must exist in Masters</p>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
-            Cancel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+  const getStatusColor = (status) => {
+    const colors = {
+      'Draft': 'bg-gray-100 text-gray-800',
+      'Tentative': 'bg-yellow-100 text-yellow-800',
+      'Confirmed': 'bg-blue-100 text-blue-800',
+      'Loaded': 'bg-purple-100 text-purple-800',
+      'Shipped': 'bg-indigo-100 text-indigo-800',
+      'In Transit': 'bg-cyan-100 text-cyan-800',
+      'Arrived': 'bg-orange-100 text-orange-800',
+      'Delivered': 'bg-green-100 text-green-800',
+      'Cancelled': 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
 
   if (loading) {
     return (
@@ -434,8 +277,8 @@ const EnhancedImportOrders = () => {
     <div className="space-y-6 fade-in-up" data-testid="enhanced-import-orders-container">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Enhanced Import Orders</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Comprehensive purchase order management with detailed product specifications</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Import Orders</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Purchase order management with Excel import/export</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExportOrders} data-testid="export-orders-btn">
@@ -453,420 +296,187 @@ const EnhancedImportOrders = () => {
                 Create Order
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto" data-testid="order-dialog">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="order-dialog">
               <DialogHeader>
-                <DialogTitle>{isEditing ? 'Edit Import Order' : 'Create Import Order'}</DialogTitle>
-                <DialogDescription>Create a comprehensive purchase order with detailed product specifications</DialogDescription>
+                <DialogTitle>Create Import Order</DialogTitle>
+                <DialogDescription>Fill in the order details and add items</DialogDescription>
               </DialogHeader>
-            <div className="grid gap-8 py-6">
-              {/* Order Header */}
-              <div className="grid grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Order Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="po_number">PO Number *</Label>
-                      <Input
-                        id="po_number"
-                        value={orderForm.po_number}
-                        onChange={(e) => setOrderForm({...orderForm, po_number: e.target.value})}
-                        placeholder="e.g., ISKY-039-040"
-                        data-testid="po-number-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="supplier_id">Supplier *</Label>
-                      <Select value={orderForm.supplier_id} onValueChange={(value) => setOrderForm({...orderForm, supplier_id: value})}>
-                        <SelectTrigger data-testid="supplier-select">
-                          <SelectValue placeholder="Select supplier" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers.map((supplier) => (
-                            <SelectItem key={supplier.id} value={supplier.id}>
-                              {supplier.name} ({supplier.code}) - {supplier.base_currency}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="port_id">Destination Port</Label>
-                      <Select value={orderForm.port_id} onValueChange={(value) => setOrderForm({...orderForm, port_id: value})}>
-                        <SelectTrigger data-testid="port-select">
-                          <SelectValue placeholder="Select destination port" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ports.map((port) => (
-                            <SelectItem key={port.id} value={port.id}>
-                              {port.name} ({port.code}) - {port.country}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
+              <div className="grid gap-6 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>PO Number *</Label>
+                    <Input
+                      value={orderForm.po_number}
+                      onChange={(e) => setOrderForm({...orderForm, po_number: e.target.value})}
+                      placeholder="e.g., PO-2024-001"
+                      data-testid="po-number-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Supplier *</Label>
+                    <Select value={orderForm.supplier_id} onValueChange={(value) => setOrderForm({...orderForm, supplier_id: value})}>
+                      <SelectTrigger data-testid="supplier-select">
+                        <SelectValue placeholder="Select supplier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label>Container</Label>
+                    <Select value={orderForm.container_type} onValueChange={(value) => setOrderForm({...orderForm, container_type: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {containers.map((c) => (
+                          <SelectItem key={c.container_type} value={c.container_type}>{c.container_type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Select value={orderForm.currency} onValueChange={(value) => setOrderForm({...orderForm, currency: value})}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="CNY">CNY</SelectItem>
+                        <SelectItem value="INR">INR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Duty Rate</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={orderForm.duty_rate}
+                      onChange={(e) => setOrderForm({...orderForm, duty_rate: e.target.value})}
+                      placeholder="0.10"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Freight Charges</Label>
+                    <Input
+                      type="number"
+                      value={orderForm.freight_charges}
+                      onChange={(e) => setOrderForm({...orderForm, freight_charges: e.target.value})}
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
                 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Logistics & Financial</CardTitle>
+                    <CardTitle className="text-base">Add Item</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-4 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="container_type">Container Type *</Label>
-                        <Select value={orderForm.container_type} onValueChange={(value) => setOrderForm({...orderForm, container_type: value})}>
-                          <SelectTrigger data-testid="container-type-select">
-                            <SelectValue placeholder="Select container" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {containers.map((container) => (
-                              <SelectItem key={container.id} value={container.container_type}>
-                                {container.container_type} (Max: {container.max_weight}KG, {container.max_cbm}CBM)
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="currency">Currency *</Label>
-                        <Select value={orderForm.currency} onValueChange={(value) => setOrderForm({...orderForm, currency: value})}>
-                          <SelectTrigger data-testid="currency-select">
-                            <SelectValue placeholder="Select currency" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="USD">USD - US Dollar</SelectItem>
-                            <SelectItem value="EUR">EUR - Euro</SelectItem>
-                            <SelectItem value="CNY">CNY - Chinese Yuan</SelectItem>
-                            <SelectItem value="INR">INR - Indian Rupee</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="eta">Expected Arrival (ETA)</Label>
-                      <Input
-                        id="eta"
-                        type="date"
-                        value={orderForm.eta}
-                        onChange={(e) => setOrderForm({...orderForm, eta: e.target.value})}
-                        data-testid="eta-input"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="duty_rate">Duty Rate (%)</Label>
-                        <Input
-                          id="duty_rate"
-                          type="number"
-                          step="0.01"
-                          value={orderForm.duty_rate}
-                          onChange={(e) => setOrderForm({...orderForm, duty_rate: e.target.value})}
-                          placeholder="10 (for 10%)"
-                          data-testid="duty-rate-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="freight_charges">Freight Charges</Label>
-                        <Input
-                          id="freight_charges"
-                          type="number"
-                          step="0.01"
-                          value={orderForm.freight_charges}
-                          onChange={(e) => setOrderForm({...orderForm, freight_charges: e.target.value})}
-                          placeholder="Container freight cost"
-                          data-testid="freight-charges-input"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-              
-              {/* Add Items Section */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calculator className="w-5 h-5" />
-                    Add Items (Based on PDF Format)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid gap-6">
-                    {/* Item Basic Info */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="sku_id">SKU *</Label>
+                        <Label>SKU *</Label>
                         <Select value={currentItem.sku_id} onValueChange={(value) => setCurrentItem({...currentItem, sku_id: value})}>
-                          <SelectTrigger data-testid="item-sku-select">
+                          <SelectTrigger>
                             <SelectValue placeholder="Select SKU" />
                           </SelectTrigger>
                           <SelectContent>
                             {skus.map((sku) => (
-                              <SelectItem key={sku.id} value={sku.id}>
-                                {sku.sku_code} - {sku.description}
-                              </SelectItem>
+                              <SelectItem key={sku.id} value={sku.id}>{sku.sku_code} - {sku.description}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="code">Product Code</Label>
+                        <Label>Quantity *</Label>
                         <Input
-                          id="code"
-                          value={currentItem.code}
-                          onChange={(e) => setCurrentItem({...currentItem, code: e.target.value})}
-                          placeholder="IS-51626VF-060BRSANL"
-                          data-testid="item-code-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="marking">Order Marking</Label>
-                        <Input
-                          id="marking"
-                          value={currentItem.marking}
-                          onChange={(e) => setCurrentItem({...currentItem, marking: e.target.value})}
-                          placeholder="Order marking/reference"
-                          data-testid="item-marking-input"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Item Description */}
-                    <div className="space-y-2">
-                      <Label htmlFor="item_description">Item Description</Label>
-                      <Textarea
-                        id="item_description"
-                        value={currentItem.item_description}
-                        onChange={(e) => setCurrentItem({...currentItem, item_description: e.target.value})}
-                        placeholder="POLYMIDE TAPE SILICON or DS TISSUE TAPE HOTMELT"
-                        data-testid="item-description-input"
-                      />
-                    </div>
-                    
-                    {/* Specifications */}
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="thickness">Thickness</Label>
-                        <Input
-                          id="thickness"
-                          value={currentItem.thickness}
-                          onChange={(e) => setCurrentItem({...currentItem, thickness: e.target.value})}
-                          placeholder="55 MIC or 200 MIC"
-                          data-testid="item-thickness-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="size">Size</Label>
-                        <Input
-                          id="size"
-                          value={currentItem.size}
-                          onChange={(e) => setCurrentItem({...currentItem, size: e.target.value})}
-                          placeholder="500MM X 2000M"
-                          data-testid="item-size-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="liner_color">Liner/Color</Label>
-                        <Input
-                          id="liner_color"
-                          value={currentItem.liner_color}
-                          onChange={(e) => setCurrentItem({...currentItem, liner_color: e.target.value})}
-                          placeholder="AMBER, DARK GREEN, WHITE"
-                          data-testid="item-liner-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantity *</Label>
-                        <Input
-                          id="quantity"
                           type="number"
                           value={currentItem.quantity}
-                          onChange={(e) => {
-                            setCurrentItem({...currentItem, quantity: e.target.value});
-                            setTimeout(calculateItemTotal, 100);
-                          }}
-                          data-testid="item-quantity-input"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Packaging & Logistics */}
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="qty_per_carton">Qty/Carton</Label>
-                        <Input
-                          id="qty_per_carton"
-                          type="number"
-                          value={currentItem.qty_per_carton}
-                          onChange={(e) => setCurrentItem({...currentItem, qty_per_carton: e.target.value})}
-                          placeholder="10, 20, 30"
-                          data-testid="item-qty-carton-input"
+                          onChange={(e) => setCurrentItem({...currentItem, quantity: e.target.value})}
+                          placeholder="100"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="total_cartons">Total Cartons</Label>
+                        <Label>Unit Price *</Label>
                         <Input
-                          id="total_cartons"
-                          type="number"
-                          value={currentItem.total_cartons}
-                          onChange={(e) => setCurrentItem({...currentItem, total_cartons: e.target.value})}
-                          data-testid="item-total-cartons-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="total_rolls">Total Rolls</Label>
-                        <Input
-                          id="total_rolls"
-                          type="number"
-                          value={currentItem.total_rolls}
-                          onChange={(e) => setCurrentItem({...currentItem, total_rolls: e.target.value})}
-                          data-testid="item-total-rolls-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="kg_per_package">KG/Package</Label>
-                        <Input
-                          id="kg_per_package"
-                          type="number"
-                          step="0.01"
-                          value={currentItem.kg_per_package}
-                          onChange={(e) => setCurrentItem({...currentItem, kg_per_package: e.target.value})}
-                          data-testid="item-kg-package-input"
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Pricing */}
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="unit_price">Unit Price *</Label>
-                        <Input
-                          id="unit_price"
                           type="number"
                           step="0.01"
                           value={currentItem.unit_price}
-                          onChange={(e) => {
-                            setCurrentItem({...currentItem, unit_price: e.target.value});
-                            setTimeout(calculateItemTotal, 100);
-                          }}
-                          data-testid="item-price-input"
+                          onChange={(e) => setCurrentItem({...currentItem, unit_price: e.target.value})}
+                          placeholder="25.50"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="price_per_sqm">Price/SQM</Label>
+                        <Label>Size</Label>
                         <Input
-                          id="price_per_sqm"
-                          type="number"
-                          step="0.01"
-                          value={currentItem.price_per_sqm}
-                          onChange={(e) => setCurrentItem({...currentItem, price_per_sqm: e.target.value})}
-                          data-testid="item-price-sqm-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="total_kg">Total KG</Label>
-                        <Input
-                          id="total_kg"
-                          type="number"
-                          step="0.01"
-                          value={currentItem.total_kg}
-                          onChange={(e) => setCurrentItem({...currentItem, total_kg: e.target.value})}
-                          data-testid="item-total-kg-input"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="total_value">Total Value</Label>
-                        <Input
-                          id="total_value"
-                          type="number"
-                          step="0.01"
-                          value={currentItem.total_value}
-                          onChange={(e) => setCurrentItem({...currentItem, total_value: e.target.value})}
-                          data-testid="item-total-value-input"
+                          value={currentItem.size}
+                          onChange={(e) => setCurrentItem({...currentItem, size: e.target.value})}
+                          placeholder="500MM X 2000M"
                         />
                       </div>
                     </div>
-                    
-                    <div className="flex justify-end">
-                      <Button onClick={handleAddItem} data-testid="add-item-btn">
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Item to Order
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-                
-              {/* Items List */}
-              {orderForm.items.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Order Items ({orderForm.items.length})</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {orderForm.items.map((item, index) => {
-                        const sku = skus.find(s => s.id === item.sku_id);
-                        return (
-                          <div key={index} className="p-4 border rounded-lg bg-gray-50" data-testid={`order-item-${index}`}>
-                            <div className="grid grid-cols-12 gap-4 items-center">
-                              <div className="col-span-3">
-                                <div className="font-medium">{item.code || sku?.sku_code}</div>
-                                <div className="text-sm text-gray-600">{item.item_description || sku?.description}</div>
-                                {item.thickness && <div className="text-xs text-gray-500">Thickness: {item.thickness}</div>}
-                              </div>
-                              <div className="col-span-2">
-                                {item.size && <div className="text-sm">Size: {item.size}</div>}
-                                {item.liner_color && <div className="text-sm text-gray-600">Color: {item.liner_color}</div>}
-                              </div>
-                              <div className="col-span-2">
-                                <div className="text-sm">Qty: {item.quantity}</div>
-                                {item.total_rolls && <div className="text-xs text-gray-500">Rolls: {item.total_rolls}</div>}
-                                {item.total_cartons && <div className="text-xs text-gray-500">Cartons: {item.total_cartons}</div>}
-                              </div>
-                              <div className="col-span-2">
-                                <div className="text-sm">Unit: {orderForm.currency} {item.unit_price}</div>
-                                {item.price_per_sqm && <div className="text-xs text-gray-500">Per SQM: {item.price_per_sqm}</div>}
-                              </div>
-                              <div className="col-span-2">
-                                <div className="font-medium text-green-600">{orderForm.currency} {item.total_value.toFixed(2)}</div>
-                                {item.total_kg && <div className="text-xs text-gray-500">Weight: {item.total_kg}kg</div>}
-                              </div>
-                              <div className="col-span-1">
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  onClick={() => handleRemoveItem(index)}
-                                  data-testid={`remove-item-${index}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    <Button onClick={handleAddItem} type="button" variant="outline">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Item
+                    </Button>
                   </CardContent>
                 </Card>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { resetForm(); setDialogOpen(false); }}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateOrder} data-testid="create-order-submit-btn">
-                {isEditing ? 'Update Order' : 'Create Order'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                
+                {orderForm.items.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Order Items ({orderForm.items.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2">SKU</th>
+                            <th className="text-left p-2">Qty</th>
+                            <th className="text-left p-2">Price</th>
+                            <th className="text-left p-2">Total</th>
+                            <th className="text-left p-2">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orderForm.items.map((item, idx) => {
+                            const sku = skus.find(s => s.id === item.sku_id);
+                            return (
+                              <tr key={idx} className="border-b">
+                                <td className="p-2">{sku?.sku_code || 'N/A'}</td>
+                                <td className="p-2">{item.quantity}</td>
+                                <td className="p-2">{orderForm.currency} {item.unit_price}</td>
+                                <td className="p-2">{orderForm.currency} {item.total_value?.toLocaleString()}</td>
+                                <td className="p-2">
+                                  <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(idx)}>
+                                    <X className="w-4 h-4 text-red-500" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleCreateOrder} data-testid="create-order-submit-btn">Create Order</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
-      {/* Orders Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -878,73 +488,48 @@ const EnhancedImportOrders = () => {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b">
+                <tr className="border-b bg-slate-50">
                   <th className="text-left p-3 font-medium">PO Number</th>
                   <th className="text-left p-3 font-medium">Supplier</th>
                   <th className="text-left p-3 font-medium">Container</th>
                   <th className="text-left p-3 font-medium">Status</th>
                   <th className="text-left p-3 font-medium">Utilization</th>
-                  <th className="text-left p-3 font-medium">Total Value</th>
-                  <th className="text-left p-3 font-medium">ETA</th>
+                  <th className="text-left p-3 font-medium">Value</th>
                   <th className="text-left p-3 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {orders.map((order) => {
                   const supplier = suppliers.find(s => s.id === order.supplier_id);
-                  const port = ports.find(p => p.id === order.port_id);
                   return (
-                    <tr key={order.id} className="table-row border-b" data-testid={`order-row-${order.po_number}`}>
+                    <tr key={order.id} className="border-b hover:bg-slate-50" data-testid={`order-row-${order.po_number}`}>
                       <td className="p-3">
                         <div className="font-medium">{order.po_number}</div>
-                        <div className="text-xs text-gray-500">{order.items.length} items</div>
+                        <div className="text-xs text-gray-500">{order.items?.length || 0} items</div>
                       </td>
+                      <td className="p-3">{supplier?.name || 'N/A'}</td>
+                      <td className="p-3">{order.container_type}</td>
                       <td className="p-3">
-                        <div>{supplier?.name || 'N/A'}</div>
-                        <div className="text-xs text-gray-500">{supplier?.code}</div>
-                      </td>
-                      <td className="p-3">
-                        <Badge variant="outline">{order.container_type}</Badge>
-                        {port && <div className="text-xs text-gray-500">→ {port.code}</div>}
-                      </td>
-                      <td className="p-3">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status}
-                        </Badge>
+                        <Badge className={getStatusColor(order.status)}>{order.status}</Badge>
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
                           <div className="w-20 bg-gray-200 rounded-full h-2">
                             <div
-                              className={`h-2 rounded-full transition-all duration-300 ${getUtilizationColor(order.utilization_percentage)}`}
+                              className={`h-2 rounded-full ${order.utilization_percentage > 90 ? 'bg-green-500' : order.utilization_percentage > 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
                               style={{ width: `${Math.min(order.utilization_percentage, 100)}%` }}
                             />
                           </div>
-                          <span className="text-sm font-medium">{order.utilization_percentage.toFixed(1)}%</span>
+                          <span className="text-sm">{order.utilization_percentage?.toFixed(1)}%</span>
                         </div>
                       </td>
-                      <td className="p-3 font-medium">{order.currency} {order.total_value.toLocaleString()}</td>
-                      <td className="p-3 text-sm">
-                        {order.eta ? new Date(order.eta).toLocaleDateString() : 'TBD'}
-                      </td>
+                      <td className="p-3 font-medium">{order.currency} {order.total_value?.toLocaleString()}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewOrder(order.id)}
-                            data-testid={`view-order-${order.po_number}`}
-                            title="View Details"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleViewOrder(order.id)} title="View Details">
                             <Eye className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleExportPDF(order.id)}
-                            data-testid={`pdf-order-${order.po_number}`}
-                            title="Download PDF"
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleExportPDF(order.id)} title="Download PDF">
                             <FileText className="w-4 h-4" />
                           </Button>
                         </div>
@@ -955,7 +540,7 @@ const EnhancedImportOrders = () => {
               </tbody>
             </table>
             {orders.length === 0 && (
-              <div className="text-center py-8" data-testid="no-orders-message">
+              <div className="text-center py-8">
                 <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">No import orders found. Create your first order to get started.</p>
               </div>
@@ -964,113 +549,116 @@ const EnhancedImportOrders = () => {
         </CardContent>
       </Card>
 
-      {/* View Order Dialog - Enhanced */}
+      {/* View Order Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto" data-testid="view-order-dialog">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="view-order-dialog">
           <DialogHeader>
             <DialogTitle>Order Details - {selectedOrder?.po_number}</DialogTitle>
           </DialogHeader>
           {selectedOrder && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-3 gap-6">
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Order Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div><span className="font-medium">PO Number:</span> {selectedOrder.po_number}</div>
-                    <div><span className="font-medium">Container:</span> {selectedOrder.container_type}</div>
-                    <div><span className="font-medium">Currency:</span> {selectedOrder.currency}</div>
-                    <div>
-                      <span className="font-medium">Status:</span>
-                      <Badge className={`ml-2 ${getStatusColor(selectedOrder.status)}`}>
-                        {selectedOrder.status}
-                      </Badge>
+                  <CardContent className="pt-4">
+                    <div className="space-y-2 text-sm">
+                      <div><strong>Container:</strong> {selectedOrder.container_type}</div>
+                      <div><strong>Currency:</strong> {selectedOrder.currency}</div>
+                      <div><strong>Status:</strong> <Badge className={getStatusColor(selectedOrder.status)}>{selectedOrder.status}</Badge></div>
                     </div>
                   </CardContent>
                 </Card>
-                
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Logistics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div><span className="font-medium">Utilization:</span> {selectedOrder.utilization_percentage.toFixed(1)}%</div>
-                    <div><span className="font-medium">Total Weight:</span> {selectedOrder.total_weight} KG</div>
-                    <div><span className="font-medium">Total CBM:</span> {selectedOrder.total_cbm}</div>
-                    <div><span className="font-medium">ETA:</span> {selectedOrder.eta ? new Date(selectedOrder.eta).toLocaleDateString() : 'TBD'}</div>
+                  <CardContent className="pt-4">
+                    <div className="space-y-2 text-sm">
+                      <div><strong>Utilization:</strong> {selectedOrder.utilization_percentage?.toFixed(1)}%</div>
+                      <div><strong>Total Weight:</strong> {selectedOrder.total_weight} KG</div>
+                      <div><strong>Total CBM:</strong> {selectedOrder.total_cbm}</div>
+                    </div>
                   </CardContent>
                 </Card>
-                
                 <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Financial</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div><span className="font-medium">Order Value:</span> {selectedOrder.currency} {selectedOrder.total_value.toLocaleString()}</div>
-                    <div><span className="font-medium">Duty Rate:</span> {(selectedOrder.duty_rate * 100).toFixed(1)}%</div>
-                    <div><span className="font-medium">Freight:</span> {selectedOrder.currency} {selectedOrder.freight_charges || 0}</div>
-                    <div><span className="font-medium">Insurance:</span> {selectedOrder.currency} {selectedOrder.insurance_charges || 0}</div>
+                  <CardContent className="pt-4">
+                    <div className="space-y-2 text-sm">
+                      <div><strong>Order Value:</strong> {selectedOrder.currency} {selectedOrder.total_value?.toLocaleString()}</div>
+                      <div><strong>Duty Rate:</strong> {(selectedOrder.duty_rate * 100).toFixed(1)}%</div>
+                      <div><strong>Freight:</strong> {selectedOrder.currency} {selectedOrder.freight_charges || 0}</div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
-              
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Order Items ({selectedOrder.items.length})</CardTitle>
+                  <CardTitle className="text-base">Order Items ({selectedOrder.items?.length || 0})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="text-left p-3 font-medium">Item Details</th>
-                          <th className="text-left p-3 font-medium">Specifications</th>
-                          <th className="text-left p-3 font-medium">Quantities</th>
-                          <th className="text-left p-3 font-medium">Pricing</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedOrder.items.map((item, index) => {
-                          const sku = skus.find(s => s.id === item.sku_id);
-                          return (
-                            <tr key={index} className="border-b">
-                              <td className="p-3">
-                                <div className="font-medium">{item.code || sku?.sku_code}</div>
-                                <div className="text-gray-600">{item.item_description || sku?.description}</div>
-                                {item.marking && <div className="text-xs text-gray-500">Marking: {item.marking}</div>}
-                              </td>
-                              <td className="p-3">
-                                {item.thickness && <div>Thickness: {item.thickness}</div>}
-                                {item.size && <div>Size: {item.size}</div>}
-                                {item.liner_color && <div>Color: {item.liner_color}</div>}
-                              </td>
-                              <td className="p-3">
-                                <div>Qty: {item.quantity}</div>
-                                {item.total_rolls && <div>Rolls: {item.total_rolls}</div>}
-                                {item.total_cartons && <div>Cartons: {item.total_cartons}</div>}
-                                {item.total_kg && <div>Weight: {item.total_kg}kg</div>}
-                              </td>
-                              <td className="p-3">
-                                <div>Unit: {selectedOrder.currency} {item.unit_price}</div>
-                                {item.price_per_sqm && <div>Per SQM: {item.price_per_sqm}</div>}
-                                <div className="font-medium text-green-600">Total: {selectedOrder.currency} {item.total_value.toLocaleString()}</div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="text-left p-2">SKU</th>
+                        <th className="text-left p-2">Description</th>
+                        <th className="text-left p-2">Qty</th>
+                        <th className="text-left p-2">Unit Price</th>
+                        <th className="text-left p-2">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedOrder.items?.map((item, idx) => {
+                        const sku = skus.find(s => s.id === item.sku_id);
+                        return (
+                          <tr key={idx} className="border-b">
+                            <td className="p-2">{sku?.sku_code || 'N/A'}</td>
+                            <td className="p-2">{item.item_description || sku?.description}</td>
+                            <td className="p-2">{item.quantity}</td>
+                            <td className="p-2">{selectedOrder.currency} {item.unit_price}</td>
+                            <td className="p-2 font-medium">{selectedOrder.currency} {item.total_value?.toLocaleString()}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </CardContent>
               </Card>
             </div>
           )}
         </DialogContent>
       </Dialog>
-      
-      {/* Import Orders Dialog */}
-      {renderUploadDialog()}
+
+      {/* Import Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-md" data-testid="po-import-dialog">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Import Purchase Orders from Excel
+            </DialogTitle>
+            <DialogDescription>Upload an Excel file to create multiple POs at once</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Excel File</Label>
+              <Input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleImportOrders}
+                disabled={uploading}
+                data-testid="po-import-file-input"
+              />
+              <p className="text-xs text-gray-500">Each row = one item. Same PO number = multiple items in one PO.</p>
+            </div>
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <span className="text-sm text-gray-600">Need a template?</span>
+              <Button variant="link" size="sm" onClick={handleDownloadTemplate} data-testid="download-po-template-btn">
+                <FileSpreadsheet className="w-4 h-4 mr-1" />
+                Download Template
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>Cancel</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
