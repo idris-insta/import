@@ -613,6 +613,61 @@ async def get_skus(current_user: User = Depends(get_current_user)):
             sku['created_at'] = datetime.fromisoformat(sku['created_at'])
     return skus
 
+@api_router.get("/skus/{sku_id}", response_model=SKU)
+async def get_sku(sku_id: str, current_user: User = Depends(get_current_user)):
+    sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
+    if not sku:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    
+    if isinstance(sku['created_at'], str):
+        sku['created_at'] = datetime.fromisoformat(sku['created_at'])
+    
+    return SKU(**sku)
+
+@api_router.put("/skus/{sku_id}", response_model=SKU)
+async def update_sku(sku_id: str, sku_data: SKUUpdate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
+    if not existing_sku:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    
+    # Check if sku_code is being updated and if it conflicts
+    if sku_data.sku_code and sku_data.sku_code != existing_sku['sku_code']:
+        code_exists = await db.skus.find_one({"sku_code": sku_data.sku_code, "id": {"$ne": sku_id}})
+        if code_exists:
+            raise HTTPException(status_code=400, detail="SKU code already exists")
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in sku_data.model_dump().items() if v is not None}
+    
+    if update_data:
+        await db.skus.update_one(
+            {"id": sku_id},
+            {"$set": update_data}
+        )
+    
+    # Fetch updated SKU
+    updated_sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
+    if isinstance(updated_sku['created_at'], str):
+        updated_sku['created_at'] = datetime.fromisoformat(updated_sku['created_at'])
+    
+    return SKU(**updated_sku)
+
+@api_router.delete("/skus/{sku_id}")
+async def delete_sku(sku_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    # Check if SKU exists
+    existing_sku = await db.skus.find_one({"id": sku_id})
+    if not existing_sku:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    
+    # Check if SKU is referenced in any import orders
+    orders_with_sku = await db.import_orders.find({"items.sku_id": sku_id}).to_list(1)
+    if orders_with_sku:
+        raise HTTPException(status_code=400, detail="Cannot delete SKU: referenced in import orders")
+    
+    # Delete SKU
+    await db.skus.delete_one({"id": sku_id})
+    return {"message": "SKU deleted successfully"}
+
 # Supplier endpoints
 @api_router.post("/suppliers", response_model=Supplier)
 async def create_supplier(supplier_data: SupplierCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
