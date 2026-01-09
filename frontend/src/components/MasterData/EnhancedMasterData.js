@@ -1239,15 +1239,18 @@ const EnhancedMasterData = () => {
                 <Container className="w-5 h-5" />
                 Enhanced Container Master
               </CardTitle>
-              <Dialog open={dialogOpen && activeTab === 'containers'} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-container-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Container
-                  </Button>
-                </DialogTrigger>
-                {renderContainerDialog()}
-              </Dialog>
+              <div className="flex items-center gap-2">
+                {renderImportExportButtons('containers')}
+                <Dialog open={dialogOpen && activeTab === 'containers'} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-container-btn">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Container
+                    </Button>
+                  </DialogTrigger>
+                  {renderContainerDialog()}
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
