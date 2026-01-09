@@ -1320,6 +1320,9 @@ const EnhancedMasterData = () => {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Import Dialog */}
+      {renderUploadDialog()}
     </div>
   );
 };
