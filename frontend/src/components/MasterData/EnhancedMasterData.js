@@ -442,7 +442,7 @@ const EnhancedMasterData = () => {
     </DialogContent>
   );
 
-  const renderPortDialog = () => (\n    <DialogContent className=\"max-w-3xl max-h-[80vh] overflow-y-auto\" data-testid=\"port-dialog\">\n      <DialogHeader>\n        <DialogTitle>{isEditing ? 'Edit Port' : 'Add New Port'}</DialogTitle>\n        <DialogDescription>Manage port information and logistics settings</DialogDescription>\n      </DialogHeader>\n      <div className=\"grid gap-6 py-4\">\n        <div className=\"grid grid-cols-2 gap-4\">\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"port_name\">Port Name *</Label>\n            <Input\n              id=\"port_name\"\n              value={portForm.name}\n              onChange={(e) => setPortForm({...portForm, name: e.target.value})}\n              placeholder=\"e.g., Port of Shanghai\"\n              data-testid=\"port-name-input\"\n            />\n          </div>\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"port_code\">Port Code *</Label>\n            <Input\n              id=\"port_code\"\n              value={portForm.code}\n              onChange={(e) => setPortForm({...portForm, code: e.target.value})}\n              placeholder=\"e.g., SHA, HKG, SIN\"\n              data-testid=\"port-code-input\"\n            />\n          </div>\n        </div>\n        <div className=\"space-y-2\">\n          <Label htmlFor=\"port_country\">Country *</Label>\n          <Input\n            id=\"port_country\"\n            value={portForm.country}\n            onChange={(e) => setPortForm({...portForm, country: e.target.value})}\n            placeholder=\"e.g., China, Singapore, India\"\n            data-testid=\"port-country-input\"\n          />\n        </div>\n        <div className=\"grid grid-cols-3 gap-4\">\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"transit_days\">Transit Days</Label>\n            <Input\n              id=\"transit_days\"\n              type=\"number\"\n              value={portForm.transit_days}\n              onChange={(e) => setPortForm({...portForm, transit_days: e.target.value})}\n              placeholder=\"30\"\n              data-testid=\"port-transit-input\"\n            />\n          </div>\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"demurrage_free_days\">Free Days</Label>\n            <Input\n              id=\"demurrage_free_days\"\n              type=\"number\"\n              value={portForm.demurrage_free_days}\n              onChange={(e) => setPortForm({...portForm, demurrage_free_days: e.target.value})}\n              placeholder=\"7\"\n              data-testid=\"port-free-days-input\"\n            />\n          </div>\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"demurrage_rate\">Demurrage Rate ($/day)</Label>\n            <Input\n              id=\"demurrage_rate\"\n              type=\"number\"\n              step=\"0.01\"\n              value={portForm.demurrage_rate}\n              onChange={(e) => setPortForm({...portForm, demurrage_rate: e.target.value})}\n              placeholder=\"50.00\"\n              data-testid=\"port-demurrage-input\"\n            />\n          </div>\n        </div>\n      </div>\n      <DialogFooter>\n        <Button variant=\"outline\" onClick={() => { resetForms(); setDialogOpen(false); }} data-testid=\"cancel-port-btn\">\n          <X className=\"w-4 h-4 mr-2\" />\n          Cancel\n        </Button>\n        <Button onClick={handleCreatePort} data-testid=\"save-port-btn\">\n          <Save className=\"w-4 h-4 mr-2\" />\n          {isEditing ? 'Update Port' : 'Create Port'}\n        </Button>\n      </DialogFooter>\n    </DialogContent>\n  );\n\n  const renderContainerDialog = () => (\n    <DialogContent className=\"max-w-2xl\" data-testid=\"container-dialog\">\n      <DialogHeader>\n        <DialogTitle>{isEditing ? 'Edit Container' : 'Add Container Type'}</DialogTitle>\n        <DialogDescription>Define container specifications and freight rates</DialogDescription>\n      </DialogHeader>\n      <div className=\"grid gap-6 py-4\">\n        <div className=\"space-y-2\">\n          <Label htmlFor=\"container_type\">Container Type *</Label>\n          <Select \n            value={containerForm.container_type} \n            onValueChange={(value) => setContainerForm({...containerForm, container_type: value})}\n          >\n            <SelectTrigger data-testid=\"container-type-select\">\n              <SelectValue placeholder=\"Select container type\" />\n            </SelectTrigger>\n            <SelectContent>\n              <SelectItem value=\"20FT\">20FT - Twenty Foot</SelectItem>\n              <SelectItem value=\"40FT\">40FT - Forty Foot</SelectItem>\n              <SelectItem value=\"40HC\">40HC - Forty Foot High Cube</SelectItem>\n            </SelectContent>\n          </Select>\n        </div>\n        <div className=\"grid grid-cols-2 gap-4\">\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"max_weight\">Max Weight (KG) *</Label>\n            <Input\n              id=\"max_weight\"\n              type=\"number\"\n              value={containerForm.max_weight}\n              onChange={(e) => setContainerForm({...containerForm, max_weight: e.target.value})}\n              placeholder=\"18000 for 20FT, 26000 for 40FT\"\n              data-testid=\"container-weight-input\"\n            />\n          </div>\n          <div className=\"space-y-2\">\n            <Label htmlFor=\"max_cbm\">Max CBM *</Label>\n            <Input\n              id=\"max_cbm\"\n              type=\"number\"\n              step=\"0.1\"\n              value={containerForm.max_cbm}\n              onChange={(e) => setContainerForm({...containerForm, max_cbm: e.target.value})}\n              placeholder=\"28 for 20FT, 58 for 40FT\"\n              data-testid=\"container-cbm-input\"\n            />\n          </div>\n        </div>\n        <div className=\"space-y-2\">\n          <Label htmlFor=\"freight_rate\">Freight Rate (USD)</Label>\n          <Input\n            id=\"freight_rate\"\n            type=\"number\"\n            step=\"0.01\"\n            value={containerForm.freight_rate}\n            onChange={(e) => setContainerForm({...containerForm, freight_rate: e.target.value})}\n            placeholder=\"Freight cost per container\"\n            data-testid=\"container-freight-input\"\n          />\n        </div>\n      </div>\n      <DialogFooter>\n        <Button variant=\"outline\" onClick={() => { resetForms(); setDialogOpen(false); }} data-testid=\"cancel-container-btn\">\n          <X className=\"w-4 h-4 mr-2\" />\n          Cancel\n        </Button>\n        <Button onClick={handleCreateContainer} data-testid=\"save-container-btn\">\n          <Save className=\"w-4 h-4 mr-2\" />\n          {isEditing ? 'Update Container' : 'Create Container'}\n        </Button>\n      </DialogFooter>\n    </DialogContent>\n  );
+  const renderSupplierDialog = () => (
     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="supplier-dialog">
       <DialogHeader>
         <DialogTitle>{isEditing ? 'Edit Supplier' : 'Add New Supplier'}</DialogTitle>
@@ -562,6 +562,169 @@ const EnhancedMasterData = () => {
     </DialogContent>
   );
 
+  const renderPortDialog = () => (
+    <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="port-dialog">
+      <DialogHeader>
+        <DialogTitle>{isEditing ? 'Edit Port' : 'Add New Port'}</DialogTitle>
+        <DialogDescription>Manage port information and logistics settings</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-6 py-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="port_name">Port Name *</Label>
+            <Input
+              id="port_name"
+              value={portForm.name}
+              onChange={(e) => setPortForm({...portForm, name: e.target.value})}
+              placeholder="e.g., Port of Shanghai"
+              data-testid="port-name-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="port_code">Port Code *</Label>
+            <Input
+              id="port_code"
+              value={portForm.code}
+              onChange={(e) => setPortForm({...portForm, code: e.target.value})}
+              placeholder="e.g., SHA, HKG, SIN"
+              data-testid="port-code-input"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="port_country">Country *</Label>
+          <Input
+            id="port_country"
+            value={portForm.country}
+            onChange={(e) => setPortForm({...portForm, country: e.target.value})}
+            placeholder="e.g., China, Singapore, India"
+            data-testid="port-country-input"
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="transit_days">Transit Days</Label>
+            <Input
+              id="transit_days"
+              type="number"
+              value={portForm.transit_days}
+              onChange={(e) => setPortForm({...portForm, transit_days: e.target.value})}
+              placeholder="30"
+              data-testid="port-transit-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demurrage_free_days">Free Days</Label>
+            <Input
+              id="demurrage_free_days"
+              type="number"
+              value={portForm.demurrage_free_days}
+              onChange={(e) => setPortForm({...portForm, demurrage_free_days: e.target.value})}
+              placeholder="7"
+              data-testid="port-free-days-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="demurrage_rate">Demurrage Rate ($/day)</Label>
+            <Input
+              id="demurrage_rate"
+              type="number"
+              step="0.01"
+              value={portForm.demurrage_rate}
+              onChange={(e) => setPortForm({...portForm, demurrage_rate: e.target.value})}
+              placeholder="50.00"
+              data-testid="port-demurrage-input"
+            />
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => { resetForms(); setDialogOpen(false); }} data-testid="cancel-port-btn">
+          <X className="w-4 h-4 mr-2" />
+          Cancel
+        </Button>
+        <Button onClick={handleCreatePort} data-testid="save-port-btn">
+          <Save className="w-4 h-4 mr-2" />
+          {isEditing ? 'Update Port' : 'Create Port'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+
+  const renderContainerDialog = () => (
+    <DialogContent className="max-w-2xl" data-testid="container-dialog">
+      <DialogHeader>
+        <DialogTitle>{isEditing ? 'Edit Container' : 'Add Container Type'}</DialogTitle>
+        <DialogDescription>Define container specifications and freight rates</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-6 py-4">
+        <div className="space-y-2">
+          <Label htmlFor="container_type">Container Type *</Label>
+          <Select 
+            value={containerForm.container_type} 
+            onValueChange={(value) => setContainerForm({...containerForm, container_type: value})}
+          >
+            <SelectTrigger data-testid="container-type-select">
+              <SelectValue placeholder="Select container type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="20FT">20FT - Twenty Foot</SelectItem>
+              <SelectItem value="40FT">40FT - Forty Foot</SelectItem>
+              <SelectItem value="40HC">40HC - Forty Foot High Cube</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="max_weight">Max Weight (KG) *</Label>
+            <Input
+              id="max_weight"
+              type="number"
+              value={containerForm.max_weight}
+              onChange={(e) => setContainerForm({...containerForm, max_weight: e.target.value})}
+              placeholder="18000 for 20FT, 26000 for 40FT"
+              data-testid="container-weight-input"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="max_cbm">Max CBM *</Label>
+            <Input
+              id="max_cbm"
+              type="number"
+              step="0.1"
+              value={containerForm.max_cbm}
+              onChange={(e) => setContainerForm({...containerForm, max_cbm: e.target.value})}
+              placeholder="28 for 20FT, 58 for 40FT"
+              data-testid="container-cbm-input"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="freight_rate">Freight Rate (USD)</Label>
+          <Input
+            id="freight_rate"
+            type="number"
+            step="0.01"
+            value={containerForm.freight_rate}
+            onChange={(e) => setContainerForm({...containerForm, freight_rate: e.target.value})}
+            placeholder="Freight cost per container"
+            data-testid="container-freight-input"
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => { resetForms(); setDialogOpen(false); }} data-testid="cancel-container-btn">
+          <X className="w-4 h-4 mr-2" />
+          Cancel
+        </Button>
+        <Button onClick={handleCreateContainer} data-testid="save-container-btn">
+          <Save className="w-4 h-4 mr-2" />
+          {isEditing ? 'Update Container' : 'Create Container'}
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -588,6 +751,7 @@ const EnhancedMasterData = () => {
           <TabsTrigger value="containers" data-testid="tab-containers">Containers ({containers.length})</TabsTrigger>
         </TabsList>
 
+        {/* SKUs Tab */}
         <TabsContent value="skus" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -692,6 +856,7 @@ const EnhancedMasterData = () => {
           </Card>
         </TabsContent>
 
+        {/* Suppliers Tab */}
         <TabsContent value="suppliers" className="space-y-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
@@ -747,7 +912,7 @@ const EnhancedMasterData = () => {
                         </td>
                         <td className="p-3 font-medium">
                           <span className={supplier.current_balance > 0 ? 'text-red-600' : 'text-green-600'}>
-                            {supplier.current_balance.toFixed(2)}
+                            {supplier.current_balance?.toFixed(2) || '0.00'}
                           </span>
                         </td>
                         <td className="p-3">
@@ -785,8 +950,179 @@ const EnhancedMasterData = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        
-        {/* Add similar enhanced views for Ports and Containers... */}\n        \n        <TabsContent value=\"ports\" className=\"space-y-4\">\n          <Card>\n            <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-4\">\n              <CardTitle className=\"flex items-center gap-2\">\n                <MapPin className=\"w-5 h-5\" />\n                Enhanced Port Master\n              </CardTitle>\n              <Dialog open={dialogOpen && activeTab === 'ports'} onOpenChange={setDialogOpen}>\n                <DialogTrigger asChild>\n                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid=\"add-port-btn\">\n                    <Plus className=\"w-4 h-4 mr-2\" />\n                    Add Port\n                  </Button>\n                </DialogTrigger>\n                {renderPortDialog()}\n              </Dialog>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full\">\n                  <thead>\n                    <tr className=\"border-b\">\n                      <th className=\"text-left p-3 font-medium\">Port Details</th>\n                      <th className=\"text-left p-3 font-medium\">Country</th>\n                      <th className=\"text-left p-3 font-medium\">Transit Time</th>\n                      <th className=\"text-left p-3 font-medium\">Demurrage</th>\n                      <th className=\"text-left p-3 font-medium\">Actions</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {ports.map((port) => (\n                      <tr key={port.id} className=\"table-row border-b\" data-testid={`port-row-${port.code}`}>\n                        <td className=\"p-3\">\n                          <div>\n                            <div className=\"font-medium\">{port.name}</div>\n                            <div className=\"text-xs text-gray-500\">{port.code}</div>\n                          </div>\n                        </td>\n                        <td className=\"p-3 font-medium\">{port.country}</td>\n                        <td className=\"p-3 text-sm\">\n                          <span className=\"inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded\">\n                            {port.transit_days || 30} days\n                          </span>\n                        </td>\n                        <td className=\"p-3 text-sm\">\n                          <div>\n                            <div>Free: {port.demurrage_free_days || 7} days</div>\n                            <div className=\"text-gray-600\">${port.demurrage_rate || 50}/day</div>\n                          </div>\n                        </td>\n                        <td className=\"p-3\">\n                          <div className=\"flex items-center gap-2\">\n                            <Button\n                              variant=\"ghost\"\n                              size=\"sm\"\n                              onClick={() => openEditDialog(port, 'port')}\n                              data-testid={`edit-port-${port.code}`}\n                            >\n                              <Edit className=\"w-4 h-4\" />\n                            </Button>\n                            <Button\n                              variant=\"ghost\"\n                              size=\"sm\"\n                              onClick={() => handleDelete(port.id, 'port')}\n                              className=\"text-red-600 hover:text-red-800\"\n                              data-testid={`delete-port-${port.code}`}\n                            >\n                              <Trash2 className=\"w-4 h-4\" />\n                            </Button>\n                          </div>\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n                {ports.length === 0 && (\n                  <div className=\"text-center py-8\" data-testid=\"no-ports-message\">\n                    <MapPin className=\"w-12 h-12 text-gray-400 mx-auto mb-4\" />\n                    <p className=\"text-gray-600\">No ports found. Add your first port to get started.</p>\n                  </div>\n                )}\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        <TabsContent value=\"containers\" className=\"space-y-4\">\n          <Card>\n            <CardHeader className=\"flex flex-row items-center justify-between space-y-0 pb-4\">\n              <CardTitle className=\"flex items-center gap-2\">\n                <Container className=\"w-5 h-5\" />\n                Enhanced Container Master\n              </CardTitle>\n              <Dialog open={dialogOpen && activeTab === 'containers'} onOpenChange={setDialogOpen}>\n                <DialogTrigger asChild>\n                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid=\"add-container-btn\">\n                    <Plus className=\"w-4 h-4 mr-2\" />\n                    Add Container\n                  </Button>\n                </DialogTrigger>\n                {renderContainerDialog()}\n              </Dialog>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full\">\n                  <thead>\n                    <tr className=\"border-b\">\n                      <th className=\"text-left p-3 font-medium\">Type</th>\n                      <th className=\"text-left p-3 font-medium\">Capacity</th>\n                      <th className=\"text-left p-3 font-medium\">Freight Rate</th>\n                      <th className=\"text-left p-3 font-medium\">Actions</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {containers.map((container) => (\n                      <tr key={container.id} className=\"table-row border-b\" data-testid={`container-row-${container.container_type}`}>\n                        <td className=\"p-3\">\n                          <Badge variant=\"outline\" className=\"text-sm font-semibold\">\n                            {container.container_type}\n                          </Badge>\n                        </td>\n                        <td className=\"p-3\">\n                          <div className=\"space-y-1\">\n                            <div className=\"text-sm font-medium\">\n                              Weight: {container.max_weight.toLocaleString()} KG\n                            </div>\n                            <div className=\"text-sm text-gray-600\">\n                              Volume: {container.max_cbm} CBM\n                            </div>\n                          </div>\n                        </td>\n                        <td className=\"p-3 font-medium text-green-600\">\n                          ${container.freight_rate?.toLocaleString() || 0}\n                        </td>\n                        <td className=\"p-3\">\n                          <div className=\"flex items-center gap-2\">\n                            <Button\n                              variant=\"ghost\"\n                              size=\"sm\"\n                              onClick={() => openEditDialog(container, 'container')}\n                              data-testid={`edit-container-${container.container_type}`}\n                            >\n                              <Edit className=\"w-4 h-4\" />\n                            </Button>\n                            <Button\n                              variant=\"ghost\"\n                              size=\"sm\"\n                              onClick={() => handleDelete(container.id, 'container')}\n                              className=\"text-red-600 hover:text-red-800\"\n                              data-testid={`delete-container-${container.container_type}`}\n                            >\n                              <Trash2 className=\"w-4 h-4\" />\n                            </Button>\n                          </div>\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n                {containers.length === 0 && (\n                  <div className=\"text-center py-8\" data-testid=\"no-containers-message\">\n                    <Container className=\"w-12 h-12 text-gray-400 mx-auto mb-4\" />\n                    <p className=\"text-gray-600\">No container types found. Add container specifications to get started.</p>\n                  </div>\n                )}\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>
+
+        {/* Ports Tab */}
+        <TabsContent value="ports" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Enhanced Port Master
+              </CardTitle>
+              <Dialog open={dialogOpen && activeTab === 'ports'} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-port-btn">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Port
+                  </Button>
+                </DialogTrigger>
+                {renderPortDialog()}
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">Port Details</th>
+                      <th className="text-left p-3 font-medium">Country</th>
+                      <th className="text-left p-3 font-medium">Transit Time</th>
+                      <th className="text-left p-3 font-medium">Demurrage</th>
+                      <th className="text-left p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ports.map((port) => (
+                      <tr key={port.id} className="table-row border-b" data-testid={`port-row-${port.code}`}>
+                        <td className="p-3">
+                          <div>
+                            <div className="font-medium">{port.name}</div>
+                            <div className="text-xs text-gray-500">{port.code}</div>
+                          </div>
+                        </td>
+                        <td className="p-3 font-medium">{port.country}</td>
+                        <td className="p-3 text-sm">
+                          <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            {port.transit_days || 30} days
+                          </span>
+                        </td>
+                        <td className="p-3 text-sm">
+                          <div>
+                            <div>Free: {port.demurrage_free_days || 7} days</div>
+                            <div className="text-gray-600">${port.demurrage_rate || 50}/day</div>
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(port, 'port')}
+                              data-testid={`edit-port-${port.code}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(port.id, 'port')}
+                              className="text-red-600 hover:text-red-800"
+                              data-testid={`delete-port-${port.code}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {ports.length === 0 && (
+                  <div className="text-center py-8" data-testid="no-ports-message">
+                    <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No ports found. Add your first port to get started.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Containers Tab */}
+        <TabsContent value="containers" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Container className="w-5 h-5" />
+                Enhanced Container Master
+              </CardTitle>
+              <Dialog open={dialogOpen && activeTab === 'containers'} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-container-btn">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Container
+                  </Button>
+                </DialogTrigger>
+                {renderContainerDialog()}
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3 font-medium">Type</th>
+                      <th className="text-left p-3 font-medium">Capacity</th>
+                      <th className="text-left p-3 font-medium">Freight Rate</th>
+                      <th className="text-left p-3 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {containers.map((container) => (
+                      <tr key={container.id} className="table-row border-b" data-testid={`container-row-${container.container_type}`}>
+                        <td className="p-3">
+                          <Badge variant="outline" className="text-sm font-semibold">
+                            {container.container_type}
+                          </Badge>
+                        </td>
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium">
+                              Weight: {container.max_weight?.toLocaleString()} KG
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              Volume: {container.max_cbm} CBM
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-3 font-medium text-green-600">
+                          ${container.freight_rate?.toLocaleString() || 0}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditDialog(container, 'container')}
+                              data-testid={`edit-container-${container.container_type}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(container.id, 'container')}
+                              className="text-red-600 hover:text-red-800"
+                              data-testid={`delete-container-${container.container_type}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {containers.length === 0 && (
+                  <div className="text-center py-8" data-testid="no-containers-message">
+                    <Container className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">No container types found. Add container specifications to get started.</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );
