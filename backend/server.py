@@ -1045,21 +1045,25 @@ async def create_import_order(order_data: ImportOrderCreate, current_user: User 
     cbm_utilization = (total_cbm / container['max_cbm']) * 100
     utilization_percentage = max(weight_utilization, cbm_utilization)
     
-    # Calculate ETA if port is specified
-    eta = None
+    # Calculate ETA: if port is specified, calculate from transit_days; otherwise use provided eta
+    calculated_eta = order_data.eta
     if order_data.port_id:
         port = await db.ports.find_one({"id": order_data.port_id}, {"_id": 0})
         if port:
-            eta = datetime.now(timezone.utc) + timedelta(days=port.get('transit_days', 30))
+            calculated_eta = datetime.now(timezone.utc) + timedelta(days=port.get('transit_days', 30))
+    
+    # Build order data dictionary excluding eta to avoid duplicate
+    order_dict = order_data.model_dump()
+    order_dict.pop('eta', None)  # Remove eta to set it explicitly
     
     order = ImportOrder(
-        **order_data.model_dump(),
+        **order_dict,
         total_quantity=total_quantity,
         total_weight=total_weight,
         total_cbm=total_cbm,
         total_value=total_value,
         utilization_percentage=utilization_percentage,
-        eta=eta,
+        eta=calculated_eta,
         created_by=current_user.id
     )
     
