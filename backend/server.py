@@ -330,9 +330,21 @@ class Document(BaseModel):
 
 class ImportOrderItem(BaseModel):
     sku_id: str
+    item_description: Optional[str] = None  # From PDF: ITEM field
+    thickness: Optional[str] = None  # From PDF: "55 MIC", "200 MIC"
+    size: Optional[str] = None  # From PDF: "500MM X 2000M"
+    liner_color: Optional[str] = None  # From PDF: "AMBER", "DARK GREEN"
     quantity: int
+    qty_per_carton: Optional[int] = None  # From PDF: QTY/CTN
+    total_cartons: Optional[int] = None  # From PDF: TOTAL CTN
+    total_rolls: Optional[int] = None  # From PDF: TOTAL ROLL
     unit_price: float
+    price_per_sqm: Optional[float] = None  # From PDF: PRICE/SQM
     total_value: float
+    kg_per_package: Optional[float] = None  # From PDF: KG PKG
+    total_kg: Optional[float] = None  # From PDF: TOTAL KG
+    code: Optional[str] = None  # From PDF: Product code like "IS-52314W-060TRHBWL"
+    marking: Optional[str] = None  # From PDF: ORDER NO MARKING
 
 class ImportOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
