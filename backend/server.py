@@ -926,7 +926,7 @@ async def delete_container(container_id: str, current_user: User = Depends(check
 @api_router.get("/masters/export/{master_type}")
 async def export_master_to_excel(
     master_type: str,
-    current_user: User = Depends(check_permission(Permission.VIEW_MASTERS.value))
+    current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))
 ):
     """Export master data to Excel file"""
     valid_types = ["skus", "suppliers", "ports", "containers"]
