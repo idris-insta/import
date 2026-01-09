@@ -300,6 +300,186 @@ const EnhancedMasterData = () => {
     }
   };
 
+  // Excel Export/Import Functions
+  const handleExportExcel = async (masterType) => {
+    try {
+      toast.info(`Exporting ${masterType} to Excel...`);
+      const response = await axios.get(`${API}/masters/export/${masterType}`, {
+        responseType: 'blob'
+      });
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${masterType}_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`${masterType} exported successfully`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error(error.response?.data?.detail || `Failed to export ${masterType}`);
+    }
+  };
+
+  const handleDownloadTemplate = async (masterType) => {
+    try {
+      const response = await axios.get(`${API}/masters/template/${masterType}`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${masterType}_import_template.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Template downloaded');
+    } catch (error) {
+      console.error('Template download error:', error);
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleImportExcel = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast.error('Please select an Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(
+        `${API}/masters/import/${activeTab}?mode=${importMode}`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      
+      const stats = response.data.statistics;
+      toast.success(
+        `Import completed! Added: ${stats.added}, Updated: ${stats.updated}, Skipped: ${stats.skipped}`
+      );
+      
+      if (stats.errors?.length > 0) {
+        console.warn('Import errors:', stats.errors);
+        toast.warning(`${stats.errors.length} rows had errors`);
+      }
+      
+      // Refresh data
+      await fetchAllData();
+      setUploadDialogOpen(false);
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to import data');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const renderImportExportButtons = (masterType) => (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleExportExcel(masterType)}
+        data-testid={`export-${masterType}-btn`}
+      >
+        <Download className="w-4 h-4 mr-1" />
+        Export
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setUploadDialogOpen(true)}
+        data-testid={`import-${masterType}-btn`}
+      >
+        <Upload className="w-4 h-4 mr-1" />
+        Import
+      </Button>
+    </div>
+  );
+
+  const renderUploadDialog = () => (
+    <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <DialogContent className="max-w-md" data-testid="import-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5" />
+            Import {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} from Excel
+          </DialogTitle>
+          <DialogDescription>
+            Upload an Excel file to import master data
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Import Mode</Label>
+            <Select value={importMode} onValueChange={setImportMode}>
+              <SelectTrigger data-testid="import-mode-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="add">Add New Only (skip existing)</SelectItem>
+                <SelectItem value="update">Add & Update Existing</SelectItem>
+                <SelectItem value="replace">Replace All (clear & import)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-gray-500">
+              {importMode === 'add' && 'Only adds new records, skips if code already exists'}
+              {importMode === 'update' && 'Adds new records and updates existing ones'}
+              {importMode === 'replace' && '⚠️ Deletes all existing data before importing'}
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Excel File</Label>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportExcel}
+              disabled={uploading}
+              data-testid="import-file-input"
+            />
+          </div>
+          
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <span className="text-sm text-gray-600">Need a template?</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => handleDownloadTemplate(activeTab)}
+              data-testid="download-template-btn"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1" />
+              Download Template
+            </Button>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   const renderSKUDialog = () => (
     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="sku-dialog">
       <DialogHeader>
