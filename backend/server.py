@@ -554,8 +554,192 @@ async def refresh_fx_rates(current_user: User = Depends(check_permission(Permiss
     else:
         raise HTTPException(status_code=500, detail="Failed to update FX rates")
 
-# Continue with other endpoints...
-# [Rest of the enhanced API endpoints will be in the next file parts due to length]
+# SKU endpoints
+@api_router.post("/skus", response_model=SKU)
+async def create_sku(sku_data: SKUCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_sku = await db.skus.find_one({"sku_code": sku_data.sku_code})
+    if existing_sku:
+        raise HTTPException(status_code=400, detail="SKU code already exists")
+    
+    sku = SKU(**sku_data.model_dump())
+    doc = sku.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.skus.insert_one(doc)
+    return sku
+
+@api_router.get("/skus", response_model=List[SKU])
+async def get_skus(current_user: User = Depends(get_current_user)):
+    skus = await db.skus.find({}, {"_id": 0}).to_list(1000)
+    for sku in skus:
+        if isinstance(sku['created_at'], str):
+            sku['created_at'] = datetime.fromisoformat(sku['created_at'])
+    return skus
+
+# Supplier endpoints
+@api_router.post("/suppliers", response_model=Supplier)
+async def create_supplier(supplier_data: SupplierCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_supplier = await db.suppliers.find_one({"code": supplier_data.code})
+    if existing_supplier:
+        raise HTTPException(status_code=400, detail="Supplier code already exists")
+    
+    supplier_dict = supplier_data.model_dump()
+    supplier_dict['current_balance'] = supplier_dict['opening_balance']
+    supplier = Supplier(**supplier_dict)
+    
+    doc = supplier.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.suppliers.insert_one(doc)
+    return supplier
+
+@api_router.get("/suppliers", response_model=List[Supplier])
+async def get_suppliers(current_user: User = Depends(get_current_user)):
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(1000)
+    for supplier in suppliers:
+        if isinstance(supplier['created_at'], str):
+            supplier['created_at'] = datetime.fromisoformat(supplier['created_at'])
+    return suppliers
+
+# Port endpoints
+@api_router.post("/ports", response_model=Port)
+async def create_port(port_data: PortCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_port = await db.ports.find_one({"code": port_data.code})
+    if existing_port:
+        raise HTTPException(status_code=400, detail="Port code already exists")
+    
+    port = Port(**port_data.model_dump())
+    doc = port.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.ports.insert_one(doc)
+    return port
+
+@api_router.get("/ports", response_model=List[Port])
+async def get_ports(current_user: User = Depends(get_current_user)):
+    ports = await db.ports.find({}, {"_id": 0}).to_list(1000)
+    for port in ports:
+        if isinstance(port['created_at'], str):
+            port['created_at'] = datetime.fromisoformat(port['created_at'])
+    return ports
+
+# Container endpoints
+@api_router.post("/containers", response_model=Container)
+async def create_container(container_data: ContainerCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    container = Container(**container_data.model_dump())
+    doc = container.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    
+    await db.containers.insert_one(doc)
+    return container
+
+@api_router.get("/containers", response_model=List[Container])
+async def get_containers(current_user: User = Depends(get_current_user)):
+    containers = await db.containers.find({}, {"_id": 0}).to_list(1000)
+    for container in containers:
+        if isinstance(container['created_at'], str):
+            container['created_at'] = datetime.fromisoformat(container['created_at'])
+    return containers
+
+# Enhanced Dashboard endpoints
+@api_router.get("/dashboard/stats")
+async def get_dashboard_stats(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
+    total_orders = await db.import_orders.count_documents({})
+    pending_orders = await db.import_orders.count_documents({
+        "status": {"$in": ["Draft", "Tentative", "Confirmed", "Loaded", "Shipped", "In Transit"]}
+    })
+    total_suppliers = await db.suppliers.count_documents({})
+    total_skus = await db.skus.count_documents({})
+    
+    # Financial metrics
+    total_pipeline = await db.import_orders.aggregate([
+        {"$match": {"status": {"$ne": "Delivered"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$total_value"}}}
+    ]).to_list(1)
+    pipeline_value = total_pipeline[0]['total'] if total_pipeline else 0
+    
+    # Orders by status
+    status_pipeline = await db.import_orders.aggregate([
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}}
+    ]).to_list(100)
+    
+    # Utilization metrics
+    utilization_pipeline = await db.import_orders.aggregate([
+        {"$match": {"utilization_percentage": {"$exists": True}}},
+        {"$group": {
+            "_id": None,
+            "avg_utilization": {"$avg": "$utilization_percentage"},
+            "underutilized": {
+                "$sum": {"$cond": [{"$lt": ["$utilization_percentage", 70]}, 1, 0]}
+            },
+            "optimal": {
+                "$sum": {"$cond": [
+                    {"$and": [
+                        {"$gte": ["$utilization_percentage", 70]},
+                        {"$lte": ["$utilization_percentage", 90]}
+                    ]}, 1, 0
+                ]}
+            },
+            "overutilized": {
+                "$sum": {"$cond": [{"$gt": ["$utilization_percentage", 90]}, 1, 0]}
+            }
+        }}
+    ]).to_list(1)
+    
+    utilization_stats = utilization_pipeline[0] if utilization_pipeline else {
+        "avg_utilization": 0, "underutilized": 0, "optimal": 0, "overutilized": 0
+    }
+    
+    # Recent orders
+    recent_orders = await db.import_orders.find(
+        {}, {"_id": 0, "po_number": 1, "status": 1, "total_value": 1, "created_at": 1}
+    ).sort("created_at", -1).limit(5).to_list(5)
+    
+    return {
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "total_suppliers": total_suppliers,
+        "total_skus": total_skus,
+        "pipeline_value": pipeline_value,
+        "recent_orders": recent_orders,
+        "orders_by_status": {item['_id']: item['count'] for item in status_pipeline},
+        "utilization_stats": utilization_stats
+    }
+
+@api_router.get("/dashboard/financial-overview")
+async def get_financial_overview(current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))):
+    return {
+        "value_in_transit": {},
+        "payment_summary": {},
+        "fx_exposure": {},
+        "supplier_balances": []
+    }
+
+@api_router.get("/dashboard/logistics-overview")
+async def get_logistics_overview(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
+    return {
+        "container_utilization": {},
+        "arriving_soon": [],
+        "demurrage_alerts": [],
+        "port_performance": {}
+    }
+
+@api_router.get("/dashboard/variance-analysis")
+async def get_variance_analysis(current_user: User = Depends(check_permission(Permission.VIEW_ANALYTICS.value))):
+    return {
+        "summary": {},
+        "top_sku_variances": [],
+        "trends": []
+    }
+
+@api_router.get("/dashboard/cash-flow-forecast")
+async def get_cash_flow_forecast(current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))):
+    return {
+        "duty_forecasts": [],
+        "demurrage_costs": [],
+        "supplier_payments": [],
+        "forecast_period": 30
+    }
 
 # Include the router
 app.include_router(api_router)
