@@ -639,6 +639,34 @@ async def get_skus(current_user: User = Depends(get_current_user)):
             sku['created_at'] = datetime.fromisoformat(sku['created_at'])
     return skus
 
+@api_router.put("/skus/{sku_id}", response_model=SKU)
+async def update_sku(sku_id: str, sku_data: SKUUpdate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_sku = await db.skus.find_one({"id": sku_id})
+    if not existing_sku:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    
+    # Check if sku_code is being changed and if it already exists
+    if sku_data.sku_code and sku_data.sku_code != existing_sku['sku_code']:
+        existing_code = await db.skus.find_one({"sku_code": sku_data.sku_code})
+        if existing_code:
+            raise HTTPException(status_code=400, detail="SKU code already exists")
+    
+    update_data = {k: v for k, v in sku_data.model_dump().items() if v is not None}
+    await db.skus.update_one({"id": sku_id}, {"$set": update_data})
+    
+    updated_sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
+    if isinstance(updated_sku['created_at'], str):
+        updated_sku['created_at'] = datetime.fromisoformat(updated_sku['created_at'])
+    
+    return SKU(**updated_sku)
+
+@api_router.delete("/skus/{sku_id}")
+async def delete_sku(sku_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    result = await db.skus.delete_one({"id": sku_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    return {"message": "SKU deleted successfully"}
+
 @api_router.get("/skus/{sku_id}", response_model=SKU)
 async def get_sku(sku_id: str, current_user: User = Depends(get_current_user)):
     sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
