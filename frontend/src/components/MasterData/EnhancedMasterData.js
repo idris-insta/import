@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2, Package, Users, MapPin, Container, Loader2, Save, X } from 'lucide-react';
+import { Plus, Edit, Trash2, Package, Users, MapPin, Container, Loader2, Save, X, Download, Upload, FileSpreadsheet } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -25,6 +25,10 @@ const EnhancedMasterData = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [importMode, setImportMode] = useState('add');
+  const fileInputRef = useRef(null);
   
   // Form states with enhanced fields
   const [skuForm, setSkuForm] = useState({
