@@ -162,21 +162,42 @@ class SKU(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     sku_code: str
     description: str
+    color: Optional[str] = None
     hsn_code: str
     micron: Optional[float] = None
-    weight_per_unit: float
-    cbm_per_unit: float
+    width_mm: Optional[float] = None  # Width in millimeters
+    length_m: Optional[float] = None  # Length in meters
+    weight_per_unit: float  # in KG
+    cbm_per_unit: float  # cubic meter
     unit_cost: Optional[float] = None
+    category: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SKUCreate(BaseModel):
     sku_code: str
     description: str
+    color: Optional[str] = None
     hsn_code: str
     micron: Optional[float] = None
+    width_mm: Optional[float] = None
+    length_m: Optional[float] = None
     weight_per_unit: float
     cbm_per_unit: float
     unit_cost: Optional[float] = None
+    category: Optional[str] = None
+
+class SKUUpdate(BaseModel):
+    sku_code: Optional[str] = None
+    description: Optional[str] = None
+    color: Optional[str] = None
+    hsn_code: Optional[str] = None
+    micron: Optional[float] = None
+    width_mm: Optional[float] = None
+    length_m: Optional[float] = None
+    weight_per_unit: Optional[float] = None
+    cbm_per_unit: Optional[float] = None
+    unit_cost: Optional[float] = None
+    category: Optional[str] = None
 
 class Supplier(BaseModel):
     model_config = ConfigDict(extra="ignore")
