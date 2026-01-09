@@ -1149,15 +1149,18 @@ const EnhancedMasterData = () => {
                 <MapPin className="w-5 h-5" />
                 Enhanced Port Master
               </CardTitle>
-              <Dialog open={dialogOpen && activeTab === 'ports'} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-port-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Port
-                  </Button>
-                </DialogTrigger>
-                {renderPortDialog()}
-              </Dialog>
+              <div className="flex items-center gap-2">
+                {renderImportExportButtons('ports')}
+                <Dialog open={dialogOpen && activeTab === 'ports'} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-port-btn">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Port
+                    </Button>
+                  </DialogTrigger>
+                  {renderPortDialog()}
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
