@@ -255,6 +255,14 @@ class PortCreate(BaseModel):
     demurrage_free_days: int = 7
     demurrage_rate: float = 50.0
 
+class PortUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    country: Optional[str] = None
+    transit_days: Optional[int] = None
+    demurrage_free_days: Optional[int] = None
+    demurrage_rate: Optional[float] = None
+
 class Container(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
