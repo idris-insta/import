@@ -111,7 +111,7 @@ function App() {
                     <main className="flex-1 overflow-x-hidden overflow-y-auto p-6">
                       <Routes>
                         <Route path="/" element={<EnhancedDashboard />} />
-                        <Route path="/masters" element={<MasterData />} />
+                        <Route path="/masters" element={<EnhancedMasterData />} />
                         <Route path="/import-orders" element={<ImportOrders />} />
                         <Route path="/actual-loading" element={<ActualLoading />} />
                         <Route path="/financial" element={<FinancialDashboard />} />
