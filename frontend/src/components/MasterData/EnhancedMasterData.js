@@ -1051,15 +1051,18 @@ const EnhancedMasterData = () => {
                 <Users className="w-5 h-5" />
                 Enhanced Supplier Master
               </CardTitle>
-              <Dialog open={dialogOpen && activeTab === 'suppliers'} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-supplier-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Supplier
-                  </Button>
-                </DialogTrigger>
-                {renderSupplierDialog()}
-              </Dialog>
+              <div className="flex items-center gap-2">
+                {renderImportExportButtons('suppliers')}
+                <Dialog open={dialogOpen && activeTab === 'suppliers'} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-supplier-btn">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Supplier
+                    </Button>
+                  </DialogTrigger>
+                  {renderSupplierDialog()}
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
