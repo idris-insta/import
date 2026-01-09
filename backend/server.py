@@ -857,6 +857,55 @@ async def get_containers(current_user: User = Depends(get_current_user)):
             container['created_at'] = datetime.fromisoformat(container['created_at'])
     return containers
 
+@api_router.get("/containers/{container_id}", response_model=Container)
+async def get_container(container_id: str, current_user: User = Depends(get_current_user)):
+    container = await db.containers.find_one({"id": container_id}, {"_id": 0})
+    if not container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    
+    if isinstance(container['created_at'], str):
+        container['created_at'] = datetime.fromisoformat(container['created_at'])
+    
+    return Container(**container)
+
+@api_router.put("/containers/{container_id}", response_model=Container)
+async def update_container(container_id: str, container_data: ContainerUpdate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_container = await db.containers.find_one({"id": container_id}, {"_id": 0})
+    if not existing_container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in container_data.model_dump().items() if v is not None}
+    
+    if update_data:
+        await db.containers.update_one(
+            {"id": container_id},
+            {"$set": update_data}
+        )
+    
+    # Fetch updated container
+    updated_container = await db.containers.find_one({"id": container_id}, {"_id": 0})
+    if isinstance(updated_container['created_at'], str):
+        updated_container['created_at'] = datetime.fromisoformat(updated_container['created_at'])
+    
+    return Container(**updated_container)
+
+@api_router.delete("/containers/{container_id}")
+async def delete_container(container_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    # Check if container exists
+    existing_container = await db.containers.find_one({"id": container_id})
+    if not existing_container:
+        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Check if container type is referenced in any import orders
+    orders_count = await db.import_orders.count_documents({"container_type": existing_container['container_type']})
+    if orders_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete container: container type referenced in import orders")
+    
+    # Delete container
+    await db.containers.delete_one({"id": container_id})
+    return {"message": "Container deleted successfully"}
+
 # Enhanced Dashboard endpoints
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
