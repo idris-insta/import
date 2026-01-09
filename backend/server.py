@@ -1180,6 +1180,577 @@ async def download_import_template(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+# ==================== IMPORT ORDER EXCEL OPERATIONS ====================
+
+@api_router.get("/import-orders/export")
+async def export_import_orders_excel(
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Export all import orders to Excel"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    
+    if not orders:
+        raise HTTPException(status_code=404, detail="No import orders found to export")
+    
+    # Flatten orders for export
+    export_data = []
+    for order in orders:
+        supplier = await db.suppliers.find_one({"id": order.get('supplier_id')}, {"_id": 0, "name": 1, "code": 1})
+        
+        for item in order.get('items', []):
+            sku = await db.skus.find_one({"id": item.get('sku_id')}, {"_id": 0, "sku_code": 1, "description": 1})
+            export_data.append({
+                "po_number": order.get('po_number'),
+                "supplier_code": supplier.get('code') if supplier else '',
+                "supplier_name": supplier.get('name') if supplier else '',
+                "status": order.get('status'),
+                "container_type": order.get('container_type'),
+                "currency": order.get('currency'),
+                "sku_code": sku.get('sku_code') if sku else '',
+                "item_description": item.get('item_description') or (sku.get('description') if sku else ''),
+                "thickness": item.get('thickness', ''),
+                "size": item.get('size', ''),
+                "liner_color": item.get('liner_color', ''),
+                "quantity": item.get('quantity'),
+                "unit_price": item.get('unit_price'),
+                "total_value": item.get('total_value'),
+                "freight_charges": order.get('freight_charges', 0),
+                "duty_rate": order.get('duty_rate', 0),
+                "created_at": order.get('created_at', ''),
+                "eta": order.get('eta', '')
+            })
+    
+    df = pd.DataFrame(export_data)
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='IMPORT_ORDERS', index=False)
+    output.seek(0)
+    
+    filename = f"import_orders_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.post("/import-orders/import")
+async def import_orders_from_excel(
+    file: UploadFile = File(...),
+    current_user: User = Depends(check_permission(Permission.MANAGE_ORDERS.value))
+):
+    """Import multiple purchase orders from Excel file"""
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="File must be an Excel file (.xlsx or .xls)")
+    
+    try:
+        contents = await file.read()
+        df = pd.read_excel(BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
+    
+    required_cols = ["po_number", "supplier_code", "sku_code", "quantity", "unit_price"]
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        raise HTTPException(status_code=400, detail=f"Missing required columns: {missing_cols}")
+    
+    df = df.fillna("")
+    records = df.to_dict('records')
+    
+    # Group by PO number
+    po_groups = {}
+    for record in records:
+        po_num = str(record.get('po_number', '')).strip()
+        if not po_num:
+            continue
+        if po_num not in po_groups:
+            po_groups[po_num] = {"items": [], "record": record}
+        po_groups[po_num]["items"].append(record)
+    
+    stats = {"created": 0, "skipped": 0, "errors": []}
+    
+    for po_num, po_data in po_groups.items():
+        try:
+            # Check if PO already exists
+            existing = await db.import_orders.find_one({"po_number": po_num}, {"_id": 0})
+            if existing:
+                stats["skipped"] += 1
+                continue
+            
+            first_record = po_data["record"]
+            
+            # Get supplier
+            supplier = await db.suppliers.find_one(
+                {"code": str(first_record.get('supplier_code', '')).strip()},
+                {"_id": 0}
+            )
+            if not supplier:
+                stats["errors"].append(f"PO {po_num}: Supplier not found")
+                continue
+            
+            # Process items
+            items = []
+            total_quantity = 0
+            total_weight = 0
+            total_cbm = 0
+            total_value = 0
+            
+            for item_record in po_data["items"]:
+                sku = await db.skus.find_one(
+                    {"sku_code": str(item_record.get('sku_code', '')).strip()},
+                    {"_id": 0}
+                )
+                if not sku:
+                    stats["errors"].append(f"PO {po_num}: SKU {item_record.get('sku_code')} not found")
+                    continue
+                
+                qty = float(item_record.get('quantity', 0))
+                unit_price = float(item_record.get('unit_price', 0))
+                item_value = qty * unit_price
+                
+                items.append({
+                    "sku_id": sku['id'],
+                    "quantity": qty,
+                    "unit_price": unit_price,
+                    "total_value": item_value,
+                    "item_description": str(item_record.get('item_description', '')),
+                    "thickness": str(item_record.get('thickness', '')),
+                    "size": str(item_record.get('size', '')),
+                    "liner_color": str(item_record.get('liner_color', ''))
+                })
+                
+                total_quantity += qty
+                total_weight += qty * sku.get('weight_per_unit', 0)
+                total_cbm += qty * sku.get('cbm_per_unit', 0)
+                total_value += item_value
+            
+            if not items:
+                stats["errors"].append(f"PO {po_num}: No valid items")
+                continue
+            
+            # Get container for utilization
+            container_type = str(first_record.get('container_type', '20FT'))
+            container = await db.containers.find_one({"container_type": container_type}, {"_id": 0})
+            utilization = 0
+            if container:
+                weight_util = (total_weight / container.get('max_weight', 1)) * 100
+                cbm_util = (total_cbm / container.get('max_cbm', 1)) * 100
+                utilization = max(weight_util, cbm_util)
+            
+            # Create order
+            order = {
+                "id": str(uuid.uuid4()),
+                "po_number": po_num,
+                "supplier_id": supplier['id'],
+                "container_type": container_type,
+                "currency": str(first_record.get('currency', 'USD')),
+                "status": "Draft",
+                "items": items,
+                "total_quantity": total_quantity,
+                "total_weight": total_weight,
+                "total_cbm": total_cbm,
+                "total_value": total_value,
+                "utilization_percentage": round(utilization, 2),
+                "freight_charges": float(first_record.get('freight_charges', 0)),
+                "duty_rate": float(first_record.get('duty_rate', 0.1)),
+                "insurance_charges": float(first_record.get('insurance_charges', 0)),
+                "other_charges": float(first_record.get('other_charges', 0)),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": current_user.id
+            }
+            
+            await db.import_orders.insert_one(order)
+            stats["created"] += 1
+            
+        except Exception as e:
+            stats["errors"].append(f"PO {po_num}: {str(e)}")
+    
+    return {
+        "message": "Import completed",
+        "statistics": stats,
+        "total_pos_processed": len(po_groups)
+    }
+
+@api_router.get("/import-orders/template")
+async def download_po_import_template(current_user: User = Depends(get_current_user)):
+    """Download Excel template for import order creation"""
+    columns = ["po_number", "supplier_code", "container_type", "currency", "sku_code", 
+               "item_description", "thickness", "size", "liner_color", "quantity", 
+               "unit_price", "freight_charges", "duty_rate"]
+    
+    sample_data = [
+        ["PO-2024-001", "SUP001", "20FT", "USD", "SKU001", "Product A", "55 MIC", "500MM X 2000M", "Clear", 100, 25.50, 500, 0.10],
+        ["PO-2024-001", "SUP001", "20FT", "USD", "SKU002", "Product B", "75 MIC", "600MM X 1500M", "Blue", 50, 30.00, 500, 0.10],
+        ["PO-2024-002", "SUP002", "40FT", "EUR", "SKU003", "Product C", "100 MIC", "700MM X 1000M", "Red", 200, 15.00, 800, 0.12]
+    ]
+    
+    df = pd.DataFrame(sample_data, columns=columns)
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='PO_TEMPLATE', index=False)
+        
+        instructions = pd.DataFrame({
+            "Instructions": [
+                "Template for importing multiple Purchase Orders",
+                "",
+                "IMPORTANT:",
+                "1. Each row represents one item in a PO",
+                "2. Multiple rows with same po_number = multiple items in one PO",
+                "3. supplier_code and sku_code must exist in Masters",
+                "",
+                "Required fields:",
+                "  - po_number: Unique PO identifier",
+                "  - supplier_code: Must match supplier code in Masters",
+                "  - sku_code: Must match SKU code in Masters",
+                "  - quantity: Number of units",
+                "  - unit_price: Price per unit",
+                "",
+                "Optional fields:",
+                "  - container_type: 20FT, 40FT, or 40HC (default: 20FT)",
+                "  - currency: USD, EUR, CNY, INR (default: USD)",
+                "  - item_description, thickness, size, liner_color",
+                "  - freight_charges, duty_rate (applied to whole PO)"
+            ]
+        })
+        instructions.to_excel(writer, sheet_name='INSTRUCTIONS', index=False, header=False)
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=po_import_template.xlsx"}
+    )
+
+# ==================== SUPPLIER-WISE PO TRACKING ====================
+
+@api_router.get("/suppliers/{supplier_id}/orders")
+async def get_supplier_orders(
+    supplier_id: str,
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Get all orders for a specific supplier with summary"""
+    supplier = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    orders = await db.import_orders.find({"supplier_id": supplier_id}, {"_id": 0}).to_list(1000)
+    
+    # Calculate summary
+    pending_orders = [o for o in orders if o.get('status') in ['Draft', 'Tentative', 'Confirmed']]
+    shipped_orders = [o for o in orders if o.get('status') in ['Shipped', 'In Transit', 'Arrived']]
+    delivered_orders = [o for o in orders if o.get('status') == 'Delivered']
+    
+    return {
+        "supplier": supplier,
+        "summary": {
+            "total_orders": len(orders),
+            "pending_count": len(pending_orders),
+            "pending_value": sum(o.get('total_value', 0) for o in pending_orders),
+            "shipped_count": len(shipped_orders),
+            "shipped_value": sum(o.get('total_value', 0) for o in shipped_orders),
+            "delivered_count": len(delivered_orders),
+            "delivered_value": sum(o.get('total_value', 0) for o in delivered_orders),
+            "total_value": sum(o.get('total_value', 0) for o in orders)
+        },
+        "orders": orders
+    }
+
+@api_router.get("/reports/supplier-wise-summary")
+async def get_supplier_wise_summary(
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Get supplier-wise PO summary with pending and shipped breakdown"""
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(1000)
+    
+    summary = []
+    for supplier in suppliers:
+        orders = await db.import_orders.find({"supplier_id": supplier['id']}, {"_id": 0}).to_list(1000)
+        
+        pending = [o for o in orders if o.get('status') in ['Draft', 'Tentative', 'Confirmed']]
+        shipped = [o for o in orders if o.get('status') in ['Shipped', 'In Transit', 'Arrived', 'Loaded']]
+        delivered = [o for o in orders if o.get('status') == 'Delivered']
+        
+        # Get payments for this supplier
+        payments = await db.payments.find({"supplier_id": supplier['id']}, {"_id": 0}).to_list(1000)
+        total_paid = sum(p.get('amount', 0) for p in payments)
+        
+        summary.append({
+            "supplier_code": supplier.get('code'),
+            "supplier_name": supplier.get('name'),
+            "currency": supplier.get('base_currency'),
+            "pending_pos": len(pending),
+            "pending_value": sum(o.get('total_value', 0) for o in pending),
+            "shipped_pos": len(shipped),
+            "shipped_value": sum(o.get('total_value', 0) for o in shipped),
+            "delivered_pos": len(delivered),
+            "delivered_value": sum(o.get('total_value', 0) for o in delivered),
+            "total_orders": len(orders),
+            "total_value": sum(o.get('total_value', 0) for o in orders),
+            "total_paid": total_paid,
+            "balance_due": sum(o.get('total_value', 0) for o in orders) - total_paid,
+            "current_balance": supplier.get('current_balance', 0)
+        })
+    
+    return {
+        "suppliers": summary,
+        "totals": {
+            "total_suppliers": len(suppliers),
+            "total_pending_value": sum(s['pending_value'] for s in summary),
+            "total_shipped_value": sum(s['shipped_value'] for s in summary),
+            "total_delivered_value": sum(s['delivered_value'] for s in summary),
+            "total_paid": sum(s['total_paid'] for s in summary),
+            "total_balance_due": sum(s['balance_due'] for s in summary)
+        }
+    }
+
+@api_router.get("/reports/supplier-wise-summary/export")
+async def export_supplier_wise_summary_excel(
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Export supplier-wise summary to Excel"""
+    summary_data = await get_supplier_wise_summary(current_user)
+    
+    df = pd.DataFrame(summary_data['suppliers'])
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='SUPPLIER_SUMMARY', index=False)
+        
+        # Add totals sheet
+        totals_df = pd.DataFrame([summary_data['totals']])
+        totals_df.to_excel(writer, sheet_name='TOTALS', index=False)
+    
+    output.seek(0)
+    
+    filename = f"supplier_wise_summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+# ==================== ADVANCED ANALYTICS & REPORTING ====================
+
+@api_router.get("/reports/analytics")
+async def get_advanced_analytics(
+    current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))
+):
+    """Get advanced analytics and KPIs"""
+    
+    # Order analytics
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    
+    # Monthly trends
+    monthly_data = {}
+    for order in orders:
+        created = order.get('created_at', '')
+        if created:
+            try:
+                month_key = created[:7] if isinstance(created, str) else created.strftime('%Y-%m')
+                if month_key not in monthly_data:
+                    monthly_data[month_key] = {"count": 0, "value": 0}
+                monthly_data[month_key]["count"] += 1
+                monthly_data[month_key]["value"] += order.get('total_value', 0)
+            except:
+                pass
+    
+    # Status distribution
+    status_dist = {}
+    for order in orders:
+        status = order.get('status', 'Unknown')
+        if status not in status_dist:
+            status_dist[status] = {"count": 0, "value": 0}
+        status_dist[status]["count"] += 1
+        status_dist[status]["value"] += order.get('total_value', 0)
+    
+    # Container utilization analysis
+    utilization_ranges = {"0-25%": 0, "26-50%": 0, "51-75%": 0, "76-100%": 0, ">100%": 0}
+    for order in orders:
+        util = order.get('utilization_percentage', 0)
+        if util <= 25:
+            utilization_ranges["0-25%"] += 1
+        elif util <= 50:
+            utilization_ranges["26-50%"] += 1
+        elif util <= 75:
+            utilization_ranges["51-75%"] += 1
+        elif util <= 100:
+            utilization_ranges["76-100%"] += 1
+        else:
+            utilization_ranges[">100%"] += 1
+    
+    # Currency exposure
+    currency_exposure = {}
+    for order in orders:
+        if order.get('status') not in ['Delivered', 'Cancelled']:
+            curr = order.get('currency', 'USD')
+            if curr not in currency_exposure:
+                currency_exposure[curr] = {"orders": 0, "value": 0}
+            currency_exposure[curr]["orders"] += 1
+            currency_exposure[curr]["value"] += order.get('total_value', 0)
+    
+    # Payment analytics
+    payments = await db.payments.find({}, {"_id": 0}).to_list(10000)
+    payment_by_month = {}
+    for payment in payments:
+        p_date = payment.get('payment_date', '')
+        if p_date:
+            try:
+                month_key = p_date[:7] if isinstance(p_date, str) else p_date.strftime('%Y-%m')
+                if month_key not in payment_by_month:
+                    payment_by_month[month_key] = {"count": 0, "amount": 0, "inr_amount": 0}
+                payment_by_month[month_key]["count"] += 1
+                payment_by_month[month_key]["amount"] += payment.get('amount', 0)
+                payment_by_month[month_key]["inr_amount"] += payment.get('inr_amount', 0)
+            except:
+                pass
+    
+    # Top suppliers by value
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    supplier_values = []
+    for supplier in suppliers:
+        supplier_orders = [o for o in orders if o.get('supplier_id') == supplier.get('id')]
+        supplier_values.append({
+            "supplier_code": supplier.get('code'),
+            "supplier_name": supplier.get('name'),
+            "order_count": len(supplier_orders),
+            "total_value": sum(o.get('total_value', 0) for o in supplier_orders)
+        })
+    supplier_values.sort(key=lambda x: x['total_value'], reverse=True)
+    
+    return {
+        "order_analytics": {
+            "total_orders": len(orders),
+            "total_value": sum(o.get('total_value', 0) for o in orders),
+            "avg_order_value": sum(o.get('total_value', 0) for o in orders) / len(orders) if orders else 0,
+            "avg_utilization": sum(o.get('utilization_percentage', 0) for o in orders) / len(orders) if orders else 0
+        },
+        "monthly_trends": dict(sorted(monthly_data.items())),
+        "status_distribution": status_dist,
+        "utilization_analysis": utilization_ranges,
+        "currency_exposure": currency_exposure,
+        "payment_trends": dict(sorted(payment_by_month.items())),
+        "top_suppliers": supplier_values[:10]
+    }
+
+# ==================== PURCHASE ORDER PDF EXPORT ====================
+
+@api_router.get("/import-orders/{order_id}/pdf")
+async def export_order_to_pdf(
+    order_id: str,
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Export a purchase order to PDF"""
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    supplier = await db.suppliers.find_one({"id": order.get('supplier_id')}, {"_id": 0})
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, alignment=TA_CENTER, spaceAfter=20)
+    header_style = ParagraphStyle('Header', parent=styles['Heading2'], fontSize=12, spaceAfter=10)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=10)
+    
+    elements = []
+    
+    # Title
+    elements.append(Paragraph(f"PURCHASE ORDER", title_style))
+    elements.append(Paragraph(f"PO Number: {order.get('po_number')}", header_style))
+    elements.append(Spacer(1, 10))
+    
+    # Order details table
+    order_info = [
+        ["Supplier:", supplier.get('name') if supplier else 'N/A', "Status:", order.get('status', 'N/A')],
+        ["Container:", order.get('container_type', 'N/A'), "Currency:", order.get('currency', 'USD')],
+        ["Created:", str(order.get('created_at', ''))[:10], "ETA:", str(order.get('eta', ''))[:10] if order.get('eta') else 'N/A'],
+    ]
+    
+    info_table = Table(order_info, colWidths=[80, 180, 80, 180])
+    info_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(info_table)
+    elements.append(Spacer(1, 20))
+    
+    # Items table
+    elements.append(Paragraph("ORDER ITEMS", header_style))
+    
+    # Table header
+    items_data = [["#", "SKU Code", "Description", "Size", "Qty", "Unit Price", "Total"]]
+    
+    for idx, item in enumerate(order.get('items', []), 1):
+        sku = await db.skus.find_one({"id": item.get('sku_id')}, {"_id": 0})
+        items_data.append([
+            str(idx),
+            sku.get('sku_code') if sku else 'N/A',
+            (item.get('item_description') or (sku.get('description') if sku else ''))[:30],
+            item.get('size', '-'),
+            str(item.get('quantity', 0)),
+            f"{order.get('currency', 'USD')} {item.get('unit_price', 0):.2f}",
+            f"{order.get('currency', 'USD')} {item.get('total_value', 0):.2f}"
+        ])
+    
+    items_table = Table(items_data, colWidths=[25, 70, 120, 80, 45, 80, 80])
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1e40af')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f8fafc')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f1f5f9')]),
+    ]))
+    elements.append(items_table)
+    elements.append(Spacer(1, 20))
+    
+    # Summary
+    elements.append(Paragraph("ORDER SUMMARY", header_style))
+    
+    summary_data = [
+        ["Total Quantity:", f"{order.get('total_quantity', 0)}", "Total Weight:", f"{order.get('total_weight', 0):.2f} KG"],
+        ["Total CBM:", f"{order.get('total_cbm', 0):.3f}", "Utilization:", f"{order.get('utilization_percentage', 0):.1f}%"],
+        ["Goods Value:", f"{order.get('currency', 'USD')} {order.get('total_value', 0):.2f}", "Freight:", f"{order.get('currency', 'USD')} {order.get('freight_charges', 0):.2f}"],
+        ["Duty Rate:", f"{(order.get('duty_rate', 0) * 100):.1f}%", "Insurance:", f"{order.get('currency', 'USD')} {order.get('insurance_charges', 0):.2f}"],
+    ]
+    
+    summary_table = Table(summary_data, colWidths=[100, 140, 100, 140])
+    summary_table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    elements.append(summary_table)
+    
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+    
+    filename = f"PO_{order.get('po_number')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # Enhanced Dashboard endpoints
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
