@@ -112,7 +112,7 @@ function App() {
                       <Routes>
                         <Route path="/" element={<EnhancedDashboard />} />
                         <Route path="/masters" element={<EnhancedMasterData />} />
-                        <Route path="/import-orders" element={<ImportOrders />} />
+                        <Route path="/import-orders" element={<EnhancedImportOrders />} />
                         <Route path="/actual-loading" element={<ActualLoading />} />
                         <Route path="/financial" element={<FinancialDashboard />} />
                         <Route path="/documents" element={<DocumentVault />} />
