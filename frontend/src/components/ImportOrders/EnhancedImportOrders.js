@@ -457,7 +457,7 @@ const EnhancedImportOrders = () => {
               <DialogHeader>
                 <DialogTitle>{isEditing ? 'Edit Import Order' : 'Create Import Order'}</DialogTitle>
                 <DialogDescription>Create a comprehensive purchase order with detailed product specifications</DialogDescription>
-            </DialogHeader>
+              </DialogHeader>
             <div className="grid gap-8 py-6">
               {/* Order Header */}
               <div className="grid grid-cols-2 gap-6">
