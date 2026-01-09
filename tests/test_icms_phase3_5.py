@@ -395,19 +395,15 @@ class TestDocuments:
         files = {
             'file': ('test_document.txt', file_content, 'text/plain')
         }
-        data = {
-            'import_order_id': test_order_id,
-            'document_type': 'Commercial Invoice',
-            'notes': 'Test document uploaded via automated testing'
-        }
         
         # Remove Content-Type from headers for multipart
         headers = {"Authorization": auth_headers["Authorization"]}
         
+        # Use query parameters for the form fields (FastAPI endpoint uses query params)
+        from urllib.parse import quote
         response = requests.post(
-            f"{BASE_URL}/api/documents/upload",
+            f"{BASE_URL}/api/documents/upload?import_order_id={test_order_id}&document_type={quote('Commercial Invoice')}&notes={quote('Test document uploaded via automated testing')}",
             files=files,
-            data=data,
             headers=headers
         )
         
@@ -433,18 +429,13 @@ class TestDocuments:
         files = {
             'file': ('bill_of_lading.pdf', file_content, 'application/pdf')
         }
-        data = {
-            'import_order_id': test_order_id,
-            'document_type': 'Bill of Lading',
-            'notes': 'Test BL document'
-        }
         
         headers = {"Authorization": auth_headers["Authorization"]}
         
+        from urllib.parse import quote
         response = requests.post(
-            f"{BASE_URL}/api/documents/upload",
+            f"{BASE_URL}/api/documents/upload?import_order_id={test_order_id}&document_type={quote('Bill of Lading')}&notes={quote('Test BL document')}",
             files=files,
-            data=data,
             headers=headers
         )
         
@@ -459,17 +450,12 @@ class TestDocuments:
         # First upload a document
         file_content = b"Test document for GET test"
         files = {'file': ('get_test.txt', file_content, 'text/plain')}
-        data = {
-            'import_order_id': test_order_id,
-            'document_type': 'Other',
-            'notes': 'Document for GET test'
-        }
         headers = {"Authorization": auth_headers["Authorization"]}
         
+        from urllib.parse import quote
         upload_response = requests.post(
-            f"{BASE_URL}/api/documents/upload",
+            f"{BASE_URL}/api/documents/upload?import_order_id={test_order_id}&document_type=Other&notes={quote('Document for GET test')}",
             files=files,
-            data=data,
             headers=headers
         )
         
@@ -494,17 +480,12 @@ class TestDocuments:
         # First upload a document
         file_content = b"Test document for DELETE test"
         files = {'file': ('delete_test.txt', file_content, 'text/plain')}
-        data = {
-            'import_order_id': test_order_id,
-            'document_type': 'Other',
-            'notes': 'Document to be deleted'
-        }
         headers = {"Authorization": auth_headers["Authorization"]}
         
+        from urllib.parse import quote
         upload_response = requests.post(
-            f"{BASE_URL}/api/documents/upload",
+            f"{BASE_URL}/api/documents/upload?import_order_id={test_order_id}&document_type=Other&notes={quote('Document to be deleted')}",
             files=files,
-            data=data,
             headers=headers
         )
         
