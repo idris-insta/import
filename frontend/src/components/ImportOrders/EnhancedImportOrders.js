@@ -255,6 +255,172 @@ const EnhancedImportOrders = () => {
     }
   };
 
+  // Excel Export/Import and PDF Functions
+  const handleExportOrders = async () => {
+    try {
+      toast.info('Generating Excel export...');
+      const response = await axios.get(`${API}/import-orders/export`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `import_orders_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Orders exported successfully');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export orders');
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/import-orders/template`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'po_import_template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Template downloaded');
+    } catch (error) {
+      console.error('Template download error:', error);
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleImportOrders = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      toast.error('Please select an Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(`${API}/import-orders/import`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      const stats = response.data.statistics;
+      toast.success(
+        `Import completed! Created: ${stats.created}, Skipped: ${stats.skipped}`
+      );
+      
+      if (stats.errors?.length > 0) {
+        console.warn('Import errors:', stats.errors);
+        toast.warning(`${stats.errors.length} POs had errors`);
+      }
+      
+      await fetchOrders();
+      setUploadDialogOpen(false);
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to import orders');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleExportPDF = async (orderId) => {
+    try {
+      toast.info('Generating PDF...');
+      const response = await axios.get(`${API}/import-orders/${orderId}/pdf`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const order = orders.find(o => o.id === orderId);
+      link.setAttribute('download', `PO_${order?.po_number || orderId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('PDF generated successfully');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to generate PDF');
+    }
+  };
+
+  const renderUploadDialog = () => (
+    <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+      <DialogContent className="max-w-md" data-testid="po-import-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileSpreadsheet className="w-5 h-5" />
+            Import Purchase Orders from Excel
+          </DialogTitle>
+          <DialogDescription>
+            Upload an Excel file to create multiple POs at once
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Excel File</Label>
+            <Input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImportOrders}
+              disabled={uploading}
+              data-testid="po-import-file-input"
+            />
+            <p className="text-xs text-gray-500">
+              Each row = one item. Multiple rows with same PO number = one PO with multiple items.
+            </p>
+          </div>
+          
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <span className="text-sm text-gray-600">Need a template?</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              data-testid="download-po-template-btn"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1" />
+              Download Template
+            </Button>
+          </div>
+          
+          <div className="text-xs text-gray-500 space-y-1">
+            <p><strong>Required columns:</strong> po_number, supplier_code, sku_code, quantity, unit_price</p>
+            <p><strong>Note:</strong> supplier_code and sku_code must exist in Masters</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+            Cancel
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
