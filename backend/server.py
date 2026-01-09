@@ -278,6 +278,12 @@ class ContainerCreate(BaseModel):
     max_cbm: float
     freight_rate: float = 0.0
 
+class ContainerUpdate(BaseModel):
+    container_type: Optional[ContainerType] = None
+    max_weight: Optional[float] = None
+    max_cbm: Optional[float] = None
+    freight_rate: Optional[float] = None
+
 class FXRate(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
