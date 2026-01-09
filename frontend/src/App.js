@@ -5,7 +5,7 @@ import { Toaster } from 'sonner';
 import Login from './components/Auth/Login';
 import EnhancedDashboard from './components/Dashboard/EnhancedDashboard';
 import EnhancedMasterData from './components/MasterData/EnhancedMasterData';
-import ImportOrders from './components/ImportOrders/ImportOrders';
+import EnhancedImportOrders from './components/ImportOrders/EnhancedImportOrders';
 import ActualLoading from './components/ActualLoading/ActualLoading';
 import FinancialDashboard from './components/Financial/FinancialDashboard';
 import DocumentVault from './components/DocumentVault/DocumentVault';
