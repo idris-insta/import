@@ -1047,6 +1047,11 @@ async def import_master_from_excel(
             if not record.get(cfg["unique_key"]):
                 continue
             
+            # Convert string fields to ensure they are strings
+            for field in cfg.get("string_fields", []):
+                if field in record and record[field] != "":
+                    record[field] = str(record[field])
+            
             # Convert numeric fields
             for field in cfg["numeric_fields"]:
                 if field in record and record[field] != "":
