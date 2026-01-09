@@ -778,6 +778,61 @@ async def get_ports(current_user: User = Depends(get_current_user)):
             port['created_at'] = datetime.fromisoformat(port['created_at'])
     return ports
 
+@api_router.get("/ports/{port_id}", response_model=Port)
+async def get_port(port_id: str, current_user: User = Depends(get_current_user)):
+    port = await db.ports.find_one({"id": port_id}, {"_id": 0})
+    if not port:
+        raise HTTPException(status_code=404, detail="Port not found")
+    
+    if isinstance(port['created_at'], str):
+        port['created_at'] = datetime.fromisoformat(port['created_at'])
+    
+    return Port(**port)
+
+@api_router.put("/ports/{port_id}", response_model=Port)
+async def update_port(port_id: str, port_data: PortUpdate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    existing_port = await db.ports.find_one({"id": port_id}, {"_id": 0})
+    if not existing_port:
+        raise HTTPException(status_code=404, detail="Port not found")
+    
+    # Check if code is being updated and if it conflicts
+    if port_data.code and port_data.code != existing_port['code']:
+        code_exists = await db.ports.find_one({"code": port_data.code, "id": {"$ne": port_id}})
+        if code_exists:
+            raise HTTPException(status_code=400, detail="Port code already exists")
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in port_data.model_dump().items() if v is not None}
+    
+    if update_data:
+        await db.ports.update_one(
+            {"id": port_id},
+            {"$set": update_data}
+        )
+    
+    # Fetch updated port
+    updated_port = await db.ports.find_one({"id": port_id}, {"_id": 0})
+    if isinstance(updated_port['created_at'], str):
+        updated_port['created_at'] = datetime.fromisoformat(updated_port['created_at'])
+    
+    return Port(**updated_port)
+
+@api_router.delete("/ports/{port_id}")
+async def delete_port(port_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
+    # Check if port exists
+    existing_port = await db.ports.find_one({"id": port_id})
+    if not existing_port:
+        raise HTTPException(status_code=404, detail="Port not found")
+    
+    # Check if port is referenced in any import orders
+    orders_count = await db.import_orders.count_documents({"port_id": port_id})
+    if orders_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete port: referenced in import orders")
+    
+    # Delete port
+    await db.ports.delete_one({"id": port_id})
+    return {"message": "Port deleted successfully"}
+
 # Container endpoints
 @api_router.post("/containers", response_model=Container)
 async def create_container(container_data: ContainerCreate, current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))):
