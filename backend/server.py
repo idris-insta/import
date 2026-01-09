@@ -208,6 +208,8 @@ class Supplier(BaseModel):
     contact_email: str
     contact_phone: str
     address: str
+    description: Optional[str] = None
+    country: Optional[str] = None
     opening_balance: float = 0.0
     current_balance: float = 0.0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -219,7 +221,20 @@ class SupplierCreate(BaseModel):
     contact_email: str
     contact_phone: str
     address: str
+    description: Optional[str] = None
+    country: Optional[str] = None
     opening_balance: float = 0.0
+
+class SupplierUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    base_currency: Optional[Currency] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    address: Optional[str] = None
+    description: Optional[str] = None
+    country: Optional[str] = None
+    opening_balance: Optional[float] = None
 
 class Port(BaseModel):
     model_config = ConfigDict(extra="ignore")
