@@ -1238,7 +1238,7 @@ async def export_import_orders_excel(
 @api_router.post("/import-orders/import")
 async def import_orders_from_excel(
     file: UploadFile = File(...),
-    current_user: User = Depends(check_permission(Permission.MANAGE_ORDERS.value))
+    current_user: User = Depends(check_permission(Permission.CREATE_ORDERS.value))
 ):
     """Import multiple purchase orders from Excel file"""
     if not file.filename.endswith(('.xlsx', '.xls')):
