@@ -1068,6 +1068,9 @@ const EnhancedImportOrders = () => {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Import Orders Dialog */}
+      {renderUploadDialog()}
     </div>
   );
 };
