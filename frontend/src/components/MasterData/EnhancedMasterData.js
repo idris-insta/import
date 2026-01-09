@@ -943,15 +943,18 @@ const EnhancedMasterData = () => {
                 <Package className="w-5 h-5" />
                 Enhanced SKU Master
               </CardTitle>
-              <Dialog open={dialogOpen && activeTab === 'skus'} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-sku-btn">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add SKU
-                  </Button>
-                </DialogTrigger>
-                {renderSKUDialog()}
-              </Dialog>
+              <div className="flex items-center gap-2">
+                {renderImportExportButtons('skus')}
+                <Dialog open={dialogOpen && activeTab === 'skus'} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={() => { resetForms(); setDialogOpen(true); }} data-testid="add-sku-btn">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add SKU
+                    </Button>
+                  </DialogTrigger>
+                  {renderSKUDialog()}
+                </Dialog>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
