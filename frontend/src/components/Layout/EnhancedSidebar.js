@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Ship, Database, Package, TruckIcon, FileText, DollarSign } from 'lucide-react';
+import { BarChart3, Ship, Database, Package, TruckIcon, FileText, DollarSign, PieChart } from 'lucide-react';
 
 const EnhancedSidebar = ({ user }) => {
   const location = useLocation();
@@ -58,6 +58,13 @@ const EnhancedSidebar = ({ user }) => {
       icon: FileText, 
       testId: 'nav-documents',
       permission: 'manage_documents'
+    },
+    { 
+      name: 'Reports', 
+      href: '/reports', 
+      icon: PieChart, 
+      testId: 'nav-reports',
+      permission: 'view_dashboard'
     },
   ];
 
