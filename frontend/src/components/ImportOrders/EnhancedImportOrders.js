@@ -928,14 +928,24 @@ const EnhancedImportOrders = () => {
                         {order.eta ? new Date(order.eta).toLocaleDateString() : 'TBD'}
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewOrder(order.id)}
                             data-testid={`view-order-${order.po_number}`}
+                            title="View Details"
                           >
                             <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleExportPDF(order.id)}
+                            data-testid={`pdf-order-${order.po_number}`}
+                            title="Download PDF"
+                          >
+                            <FileText className="w-4 h-4" />
                           </Button>
                         </div>
                       </td>
