@@ -117,6 +117,7 @@ function App() {
                         <Route path="/actual-loading" element={<ActualLoading />} />
                         <Route path="/financial" element={<FinancialDashboard />} />
                         <Route path="/documents" element={<DocumentVault />} />
+                        <Route path="/reports" element={<ReportsAnalytics />} />
                       </Routes>
                     </main>
                   </div>
