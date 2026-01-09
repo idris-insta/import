@@ -55,6 +55,7 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - [x] Port Master with transit days, demurrage settings
 - [x] Container Master with type, capacity, freight rates
 - [x] Full CRUD operations for all masters (Create, Read, Update, Delete)
+- [x] **Excel Export/Import for all masters** - Export to Excel, Import from Excel with Add/Update/Replace modes, Download templates
 
 ### Phase 1: Planning (COMPLETE ✅)
 - [x] Import Order creation with detailed item specifications
