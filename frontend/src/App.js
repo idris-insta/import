@@ -4,7 +4,7 @@ import axios from 'axios';
 import { Toaster } from 'sonner';
 import Login from './components/Auth/Login';
 import EnhancedDashboard from './components/Dashboard/EnhancedDashboard';
-import MasterData from './components/MasterData/MasterData';
+import EnhancedMasterData from './components/MasterData/EnhancedMasterData';
 import ImportOrders from './components/ImportOrders/ImportOrders';
 import ActualLoading from './components/ActualLoading/ActualLoading';
 import FinancialDashboard from './components/Financial/FinancialDashboard';
