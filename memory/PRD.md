@@ -123,6 +123,11 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - GET/POST/PUT/DELETE `/api/ports` - Port management
 - GET/POST/PUT/DELETE `/api/containers` - Container management
 
+### Master Data Excel Operations
+- GET `/api/masters/export/{master_type}` - Export to Excel (skus, suppliers, ports, containers)
+- POST `/api/masters/import/{master_type}` - Import from Excel with mode (add/update/replace)
+- GET `/api/masters/template/{master_type}` - Download import template
+
 ### Orders & Loading
 - GET/POST `/api/import-orders` - Import order management
 - GET `/api/import-orders/{id}` - Get specific order
