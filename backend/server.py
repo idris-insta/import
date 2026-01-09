@@ -921,6 +921,250 @@ async def delete_container(container_id: str, current_user: User = Depends(check
     await db.containers.delete_one({"id": container_id})
     return {"message": "Container deleted successfully"}
 
+# ==================== EXCEL EXPORT/IMPORT ENDPOINTS ====================
+
+@api_router.get("/masters/export/{master_type}")
+async def export_master_to_excel(
+    master_type: str,
+    current_user: User = Depends(check_permission(Permission.VIEW_MASTERS.value))
+):
+    """Export master data to Excel file"""
+    valid_types = ["skus", "suppliers", "ports", "containers"]
+    if master_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid master type. Must be one of: {valid_types}")
+    
+    # Fetch data
+    data = await db[master_type].find({}, {"_id": 0}).to_list(10000)
+    
+    if not data:
+        raise HTTPException(status_code=404, detail=f"No {master_type} data found to export")
+    
+    # Define columns for each master type
+    columns_map = {
+        "skus": ["sku_code", "description", "color", "hsn_code", "micron", "width_mm", "length_m", 
+                 "weight_per_unit", "cbm_per_unit", "unit_cost", "category"],
+        "suppliers": ["code", "name", "base_currency", "country", "contact_email", "contact_phone", 
+                     "address", "description", "opening_balance"],
+        "ports": ["code", "name", "country", "transit_days", "demurrage_free_days", "demurrage_rate"],
+        "containers": ["container_type", "max_weight", "max_cbm", "freight_rate"]
+    }
+    
+    columns = columns_map[master_type]
+    
+    # Create DataFrame with selected columns
+    df_data = []
+    for item in data:
+        row = {col: item.get(col, "") for col in columns}
+        df_data.append(row)
+    
+    df = pd.DataFrame(df_data, columns=columns)
+    
+    # Create Excel file in memory
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=master_type.upper(), index=False)
+    output.seek(0)
+    
+    filename = f"{master_type}_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.post("/masters/import/{master_type}")
+async def import_master_from_excel(
+    master_type: str,
+    file: UploadFile = File(...),
+    mode: str = Query("add", description="Import mode: 'add' (add new only), 'update' (update existing), 'replace' (clear and replace all)"),
+    current_user: User = Depends(check_permission(Permission.MANAGE_MASTERS.value))
+):
+    """Import master data from Excel file"""
+    valid_types = ["skus", "suppliers", "ports", "containers"]
+    if master_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid master type. Must be one of: {valid_types}")
+    
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="File must be an Excel file (.xlsx or .xls)")
+    
+    # Read Excel file
+    try:
+        contents = await file.read()
+        df = pd.read_excel(BytesIO(contents))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading Excel file: {str(e)}")
+    
+    # Define required columns and unique key for each master type
+    config = {
+        "skus": {
+            "required": ["sku_code", "description", "hsn_code", "weight_per_unit", "cbm_per_unit"],
+            "unique_key": "sku_code",
+            "numeric_fields": ["micron", "width_mm", "length_m", "weight_per_unit", "cbm_per_unit", "unit_cost"]
+        },
+        "suppliers": {
+            "required": ["code", "name", "base_currency", "contact_email", "contact_phone", "address"],
+            "unique_key": "code",
+            "numeric_fields": ["opening_balance"]
+        },
+        "ports": {
+            "required": ["code", "name", "country"],
+            "unique_key": "code",
+            "numeric_fields": ["transit_days", "demurrage_free_days", "demurrage_rate"]
+        },
+        "containers": {
+            "required": ["container_type", "max_weight", "max_cbm"],
+            "unique_key": "container_type",
+            "numeric_fields": ["max_weight", "max_cbm", "freight_rate"]
+        }
+    }
+    
+    cfg = config[master_type]
+    
+    # Validate required columns
+    missing_cols = [col for col in cfg["required"] if col not in df.columns]
+    if missing_cols:
+        raise HTTPException(status_code=400, detail=f"Missing required columns: {missing_cols}")
+    
+    # Clean and process data
+    df = df.fillna("")
+    records = df.to_dict('records')
+    
+    stats = {"added": 0, "updated": 0, "skipped": 0, "errors": []}
+    
+    if mode == "replace":
+        # Clear all existing data
+        await db[master_type].delete_many({})
+        stats["cleared"] = True
+    
+    for idx, record in enumerate(records):
+        try:
+            # Skip empty rows
+            if not record.get(cfg["unique_key"]):
+                continue
+            
+            # Convert numeric fields
+            for field in cfg["numeric_fields"]:
+                if field in record and record[field] != "":
+                    try:
+                        record[field] = float(record[field])
+                    except (ValueError, TypeError):
+                        record[field] = None
+            
+            unique_value = str(record[cfg["unique_key"]]).strip()
+            
+            # Check if exists
+            existing = await db[master_type].find_one({cfg["unique_key"]: unique_value}, {"_id": 0})
+            
+            if existing:
+                if mode in ["update", "replace"]:
+                    # Update existing record
+                    update_data = {k: v for k, v in record.items() if v != "" and v is not None}
+                    await db[master_type].update_one(
+                        {cfg["unique_key"]: unique_value},
+                        {"$set": update_data}
+                    )
+                    stats["updated"] += 1
+                else:
+                    stats["skipped"] += 1
+            else:
+                # Add new record
+                new_record = {
+                    "id": str(uuid.uuid4()),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    **{k: v for k, v in record.items() if v != ""}
+                }
+                
+                # Set defaults for suppliers
+                if master_type == "suppliers":
+                    new_record.setdefault("current_balance", new_record.get("opening_balance", 0))
+                
+                await db[master_type].insert_one(new_record)
+                stats["added"] += 1
+                
+        except Exception as e:
+            stats["errors"].append(f"Row {idx + 2}: {str(e)}")
+    
+    return {
+        "message": f"Import completed for {master_type}",
+        "statistics": stats,
+        "total_processed": len(records)
+    }
+
+@api_router.get("/masters/template/{master_type}")
+async def download_import_template(
+    master_type: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Download Excel template for master data import"""
+    valid_types = ["skus", "suppliers", "ports", "containers"]
+    if master_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid master type. Must be one of: {valid_types}")
+    
+    # Define template columns with sample data
+    templates = {
+        "skus": {
+            "columns": ["sku_code", "description", "color", "hsn_code", "micron", "width_mm", "length_m", 
+                       "weight_per_unit", "cbm_per_unit", "unit_cost", "category"],
+            "sample": ["SKU001", "Sample Product", "Red", "39201010", 50, 500, 2000, 0.5, 0.001, 10.50, "Raw Materials"]
+        },
+        "suppliers": {
+            "columns": ["code", "name", "base_currency", "country", "contact_email", "contact_phone", 
+                       "address", "description", "opening_balance"],
+            "sample": ["SUP001", "Sample Supplier", "USD", "China", "contact@supplier.com", "+86-123-456-7890",
+                      "123 Business Street, Shanghai", "Sample supplier description", 0]
+        },
+        "ports": {
+            "columns": ["code", "name", "country", "transit_days", "demurrage_free_days", "demurrage_rate"],
+            "sample": ["SHA", "Shanghai Port", "China", 25, 7, 75.00]
+        },
+        "containers": {
+            "columns": ["container_type", "max_weight", "max_cbm", "freight_rate"],
+            "sample": ["20FT", 18000, 28, 1500.00]
+        }
+    }
+    
+    template = templates[master_type]
+    
+    # Create DataFrame with headers and sample row
+    df = pd.DataFrame([template["sample"]], columns=template["columns"])
+    
+    # Create Excel file in memory
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name=f'{master_type.upper()}_TEMPLATE', index=False)
+        
+        # Add instructions sheet
+        instructions = pd.DataFrame({
+            "Instructions": [
+                f"Template for importing {master_type.upper()} data",
+                "",
+                "Required fields (must not be empty):",
+                *[f"  - {col}" for col in templates[master_type]["columns"][:5]],
+                "",
+                "Optional fields:",
+                *[f"  - {col}" for col in templates[master_type]["columns"][5:]],
+                "",
+                "Notes:",
+                "1. Do not change column headers",
+                "2. Delete the sample row before uploading",
+                "3. Numeric fields should contain only numbers",
+                "4. Currency codes: USD, EUR, CNY, INR",
+                "5. Container types: 20FT, 40FT, 40HC"
+            ]
+        })
+        instructions.to_excel(writer, sheet_name='INSTRUCTIONS', index=False, header=False)
+    
+    output.seek(0)
+    
+    filename = f"{master_type}_import_template.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # Enhanced Dashboard endpoints
 @api_router.get("/dashboard/stats")
 async def get_dashboard_stats(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
