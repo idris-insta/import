@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
-import { Plus, Package, AlertTriangle, CheckCircle, Clock, Eye, Loader2, Edit, Trash2, Calculator } from 'lucide-react';
+import { Plus, Package, AlertTriangle, CheckCircle, Clock, Eye, Loader2, Edit, Trash2, Calculator, Download, Upload, FileSpreadsheet, FileText } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -25,6 +25,9 @@ const EnhancedImportOrders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
   
   const [orderForm, setOrderForm] = useState({
     po_number: '',
