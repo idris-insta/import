@@ -802,10 +802,24 @@ async def get_import_orders(current_user: User = Depends(check_permission(Permis
     for order in orders:
         if isinstance(order['created_at'], str):
             order['created_at'] = datetime.fromisoformat(order['created_at'])
-        if isinstance(order['updated_at'], str):
+        if order.get('updated_at') and isinstance(order['updated_at'], str):
             order['updated_at'] = datetime.fromisoformat(order['updated_at'])
+        elif not order.get('updated_at'):
+            order['updated_at'] = order['created_at']  # Default to created_at if missing
         if order.get('eta') and isinstance(order['eta'], str):
             order['eta'] = datetime.fromisoformat(order['eta'])
+        
+        # Set default values for missing fields
+        if not order.get('landed_cost_per_unit'):
+            order['landed_cost_per_unit'] = {}
+        if not order.get('port_id'):
+            order['port_id'] = None
+        if not order.get('eta'):
+            order['eta'] = None
+        if not order.get('demurrage_start'):
+            order['demurrage_start'] = None
+        if not order.get('customs_value'):
+            order['customs_value'] = None
     return orders
 
 @api_router.get("/import-orders/{order_id}", response_model=ImportOrder)
