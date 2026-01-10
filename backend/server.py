@@ -698,6 +698,97 @@ async def get_skus(current_user: User = Depends(get_current_user)):
             sku['created_at'] = datetime.fromisoformat(sku['created_at'])
     return skus
 
+# ==================== SYSTEM SETTINGS ENDPOINTS ====================
+
+@api_router.get("/settings")
+async def get_settings(current_user: User = Depends(get_current_user)):
+    """Get system settings including dropdown options"""
+    settings = await db.system_settings.find_one({"id": "system_settings"}, {"_id": 0})
+    
+    if not settings:
+        # Create default settings
+        default_settings = SystemSettings()
+        await db.system_settings.insert_one(default_settings.model_dump())
+        return default_settings
+    
+    return settings
+
+@api_router.put("/settings")
+async def update_settings(
+    settings_data: SystemSettingsUpdate,
+    current_user: User = Depends(check_permission(Permission.SYSTEM_ADMIN.value))
+):
+    """Update system settings"""
+    existing = await db.system_settings.find_one({"id": "system_settings"}, {"_id": 0})
+    
+    if not existing:
+        # Create default settings first
+        default_settings = SystemSettings()
+        await db.system_settings.insert_one(default_settings.model_dump())
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in settings_data.model_dump().items() if v is not None}
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    if update_data:
+        await db.system_settings.update_one(
+            {"id": "system_settings"},
+            {"$set": update_data}
+        )
+    
+    updated_settings = await db.system_settings.find_one({"id": "system_settings"}, {"_id": 0})
+    return updated_settings
+
+@api_router.post("/settings/logo")
+async def upload_logo(
+    file: UploadFile = File(...),
+    current_user: User = Depends(check_permission(Permission.SYSTEM_ADMIN.value))
+):
+    """Upload company logo"""
+    if not file.content_type.startswith('image/'):
+        raise HTTPException(status_code=400, detail="File must be an image")
+    
+    # Save logo file
+    file_ext = Path(file.filename).suffix
+    logo_filename = f"company_logo{file_ext}"
+    logo_path = UPLOADS_DIR / logo_filename
+    
+    with open(logo_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Update settings with logo URL
+    logo_url = f"/uploads/{logo_filename}"
+    await db.system_settings.update_one(
+        {"id": "system_settings"},
+        {"$set": {"logo_url": logo_url, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    
+    return {"message": "Logo uploaded successfully", "logo_url": logo_url}
+
+@api_router.get("/settings/dropdown-options")
+async def get_dropdown_options(current_user: User = Depends(get_current_user)):
+    """Get all dropdown options for forms"""
+    settings = await db.system_settings.find_one({"id": "system_settings"}, {"_id": 0})
+    
+    if not settings:
+        default_settings = SystemSettings()
+        return {
+            "categories": default_settings.categories,
+            "adhesive_types": default_settings.adhesive_types,
+            "liner_colors": default_settings.liner_colors,
+            "shipping_marks": default_settings.shipping_marks,
+            "order_statuses": default_settings.order_statuses
+        }
+    
+    return {
+        "categories": settings.get('categories', []),
+        "adhesive_types": settings.get('adhesive_types', []),
+        "liner_colors": settings.get('liner_colors', []),
+        "shipping_marks": settings.get('shipping_marks', []),
+        "order_statuses": settings.get('order_statuses', [])
+    }
+
 @api_router.get("/skus/{sku_id}", response_model=SKU)
 async def get_sku(sku_id: str, current_user: User = Depends(get_current_user)):
     sku = await db.skus.find_one({"id": sku_id}, {"_id": 0})
