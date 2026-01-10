@@ -1791,6 +1791,11 @@ async def export_order_to_pdf(
     
     supplier = await db.suppliers.find_one({"id": order.get('supplier_id')}, {"_id": 0})
     
+    # Get system settings for PDF customization
+    settings = await db.system_settings.find_one({"id": "system_settings"}, {"_id": 0})
+    if not settings:
+        settings = SystemSettings().model_dump()
+    
     # Create PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -1802,8 +1807,16 @@ async def export_order_to_pdf(
     
     elements = []
     
+    # Company Header
+    if settings.get('company_name'):
+        elements.append(Paragraph(settings.get('company_name'), title_style))
+    if settings.get('company_address'):
+        elements.append(Paragraph(settings.get('company_address'), normal_style))
+    elements.append(Spacer(1, 10))
+    
     # Title
-    elements.append(Paragraph(f"PURCHASE ORDER", title_style))
+    header_text = settings.get('header_text', 'PURCHASE ORDER')
+    elements.append(Paragraph(header_text, title_style))
     elements.append(Paragraph(f"PO Number: {order.get('po_number')}", header_style))
     elements.append(Spacer(1, 10))
     
@@ -1813,6 +1826,10 @@ async def export_order_to_pdf(
         ["Container:", order.get('container_type', 'N/A'), "Currency:", order.get('currency', 'USD')],
         ["Created:", str(order.get('created_at', ''))[:10], "ETA:", str(order.get('eta', ''))[:10] if order.get('eta') else 'N/A'],
     ]
+    
+    # Add shipping date if available
+    if order.get('shipping_date'):
+        order_info.append(["Shipping Date:", str(order.get('shipping_date'))[:10], "", ""])
     
     info_table = Table(order_info, colWidths=[80, 180, 80, 180])
     info_table.setStyle(TableStyle([
