@@ -16,6 +16,9 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 3. Integration with exchange rate API and document management
 4. Editable master data modules
 5. Additional fields (width, meter, color, description) in masters and purchase orders
+6. System-wide Settings page for managing dropdowns and document templates
+7. Enhanced Item Master fields: Category, Adhesive Type, Liner Color, Shipping Mark, Marking
+8. Enhanced PO features: Edit, Delete, Duplicate, Item Search, Shipping Date
 
 ## Tech Stack
 - **Backend:** FastAPI (Python), MongoDB, JWT Authentication
@@ -41,6 +44,8 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
         │   ├── ActualLoading/ActualLoading.js
         │   ├── Financial/FinancialDashboard.js
         │   ├── DocumentVault/DocumentVault.js
+        │   ├── Reports/ReportsAnalytics.js
+        │   ├── Settings/SystemSettings.js  ✨ NEW
         │   └── Layout/
 ```
 
@@ -51,60 +56,68 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 - [x] User roles: Owner, Logistics, Accounts, Purchase
 - [x] Role-based permissions system
 - [x] SKU Master with enhanced fields (color, width, length, micron)
+- [x] **NEW:** SKU fields: Category, Adhesive Type, Liner Color, Shipping Mark, Marking
 - [x] Supplier Master with currency, contact details
 - [x] Port Master with transit days, demurrage settings
 - [x] Container Master with type, capacity, freight rates
-- [x] Full CRUD operations for all masters (Create, Read, Update, Delete)
-- [x] **Excel Export/Import for all masters** - Export to Excel, Import from Excel with Add/Update/Replace modes, Download templates
+- [x] Full CRUD operations for all masters
+- [x] Excel Export/Import for all masters
 
 ### Phase 1: Planning (COMPLETE ✅)
 - [x] Import Order creation with detailed item specifications
+- [x] **NEW:** Edit existing orders
+- [x] **NEW:** Delete orders
+- [x] **NEW:** Duplicate orders
+- [x] **NEW:** Item search by SKU code or name
+- [x] **NEW:** Shipping Date / Schedule field
 - [x] Container utilization calculation
 - [x] ETA calculation based on port transit days
-- [x] Support for multiple items per order
 - [x] PDF-format fields (thickness, size, liner/color, qty/carton, total rolls/cartons)
+- [x] PDF export with configurable duty rate visibility
 
 ### Phase 2: Execution (COMPLETE ✅)
 - [x] Actual Loading page with variance tracking
 - [x] Record Loading dialog to input actual quantities
 - [x] Variance calculation (Quantity, Weight, Value)
 - [x] Auto-update order status to "Loaded"
+- [x] **FIXED:** PO dropdown now shows all orders including Draft
 
 ### Phase 3: Financials (COMPLETE ✅)
-- [x] Payment recording with multi-currency support (USD, EUR, CNY, INR)
+- [x] Payment recording with multi-currency support
 - [x] Automatic FX rate conversion
-- [x] FX Rates management (list, refresh)
-- [x] Financial Dashboard with 4 tabs (Overview, Payments, FX Rates, Analytics)
+- [x] FX Rates management
+- [x] Financial Dashboard with 4 tabs
 - [x] Supplier balance updates on payment
-- [x] Payment history with reference tracking
+- [x] **FIXED:** PO dropdown now shows all orders including Draft
 
 ### Phase 4: Documents & Landed Costing (COMPLETE ✅)
 - [x] Document Vault with file upload
-- [x] Document types: Bill of Lading, Commercial Invoice, Packing List, Bill of Entry, Certificate
 - [x] Document linking to import orders
-- [x] Compliance status tracking (Complete/Partial/Incomplete)
-- [x] Landed Cost calculation API with hybrid allocation:
-  - Freight by CBM
-  - Duty by Value
-  - Port Charges by Weight
+- [x] Compliance status tracking
+- [x] Landed Cost calculation API
 
 ### Phase 5: Intelligence Dashboard (COMPLETE ✅)
-- [x] KPI Summary API with comprehensive metrics
-- [x] Demurrage Clock tracking orders at port
+- [x] KPI Summary API
+- [x] Demurrage Clock tracking
 - [x] Pipeline Value calculation
 - [x] Container Utilization statistics
-- [x] FX Exposure breakdown by currency
+- [x] FX Exposure breakdown
 
 ### Phase 6: ERP Integration (COMPLETE ✅)
-- [x] ERP Export endpoint (`/api/erp-export/{order_id}`)
-- [x] Clean JSON format with order, supplier, items, financials, logistics, compliance
+- [x] ERP Export endpoint
+- [x] Clean JSON format export
+
+### System Settings (NEW ✅)
+- [x] Settings page at /settings route
+- [x] **Company Tab:** Company name, address, phone, email, logo upload
+- [x] **Documents Tab:** Header text, footer text, show/hide duty rate on PDF
+- [x] **Dropdowns Tab:** Manage categories, adhesive types, liner colors, shipping marks, order statuses
 
 ## Test Results (January 2026)
-- **Backend: 52/52 tests passed (100%)**
-- **Frontend: 100% working**
+- **Backend:** All tests passed
+- **Frontend:** 100% working (iteration_4.json)
 - Test files:
-  - `/app/tests/test_icms_backend.py` - Original CRUD tests
-  - `/app/tests/test_icms_phase3_5.py` - Phase 3-5 feature tests
+  - `/app/test_reports/iteration_4.json` - Latest comprehensive frontend test
 
 ## Test Credentials
 - **Email:** owner@icms.com
@@ -112,69 +125,70 @@ Build a comprehensive Import & Container Management System (ICMS) with the follo
 
 ## API Endpoints
 
-### Authentication
-- POST `/api/auth/login` - User login
-- POST `/api/auth/register` - User registration
-- GET `/api/auth/me` - Get current user
-
-### Master Data
-- GET/POST/PUT/DELETE `/api/skus` - SKU management
-- GET/POST/PUT/DELETE `/api/suppliers` - Supplier management
-- GET/POST/PUT/DELETE `/api/ports` - Port management
-- GET/POST/PUT/DELETE `/api/containers` - Container management
-
-### Master Data Excel Operations
-- GET `/api/masters/export/{master_type}` - Export to Excel (skus, suppliers, ports, containers)
-- POST `/api/masters/import/{master_type}` - Import from Excel with mode (add/update/replace)
-- GET `/api/masters/template/{master_type}` - Download import template
-
-### Orders & Loading
-- GET/POST `/api/import-orders` - Import order management
-- GET `/api/import-orders/{id}` - Get specific order
-- GET/POST `/api/actual-loadings` - Actual loading records
-
-### Payments
-- GET/POST `/api/payments` - Payment management
-- GET `/api/payments/by-order/{order_id}` - Payments for order
-- GET `/api/payments/by-supplier/{supplier_id}` - Payments for supplier
-- DELETE `/api/payments/{id}` - Delete payment
-
-### Documents
-- POST `/api/documents/upload` - Upload document
-- GET `/api/documents` - List all documents
-- GET `/api/documents/order/{order_id}` - Documents for order
-- GET `/api/documents/{id}` - Get specific document
-- DELETE `/api/documents/{id}` - Delete document
-
-### Dashboard & Intelligence
-- GET `/api/dashboard/stats` - Main stats
-- GET `/api/dashboard/kpi-summary` - Comprehensive KPIs
-- GET `/api/dashboard/demurrage-clock` - Demurrage tracking
-- GET `/api/dashboard/landed-cost/{order_id}` - Landed cost breakdown
-- GET `/api/dashboard/financial-overview` - Financial metrics
-- GET `/api/dashboard/logistics-overview` - Logistics metrics
-- GET `/api/erp-export/{order_id}` - ERP JSON export
-
-### FX Rates
-- GET `/api/fx-rates` - List FX rates
-- POST `/api/fx-rates/refresh` - Update FX rates
+### New/Updated Endpoints
+- GET `/api/settings` - Get system settings
+- PUT `/api/settings` - Update system settings
+- POST `/api/settings/logo` - Upload company logo
+- GET `/api/settings/dropdown-options` - Get all dropdown options for forms
+- PUT `/api/import-orders/{order_id}` - Edit existing order
+- DELETE `/api/import-orders/{order_id}` - Delete order
+- POST `/api/import-orders/{order_id}/duplicate` - Duplicate order
+- GET `/api/import-orders/{order_id}/pdf` - Export PDF (respects duty rate setting)
 
 ## Database Schema (MongoDB Collections)
 - `users` - User accounts with roles and permissions
-- `skus` - Stock Keeping Units
+- `skus` - Stock Keeping Units with new fields (category, adhesive_type, liner_color, shipping_mark, marking)
 - `suppliers` - Supplier information
 - `ports` - Port details
 - `containers` - Container specifications
-- `import_orders` - Purchase orders
+- `import_orders` - Purchase orders with shipping_date field
 - `actual_loadings` - Actual loading records
 - `payments` - Payment records
 - `documents` - Document metadata
 - `fx_rates` - Currency exchange rates
+- `system_settings` - System-wide settings and dropdown options
 
-## Future Enhancements (Backlog)
-- [ ] Real-time ExchangeRate-API integration (currently using stored rates)
-- [ ] Multi-entity/warehouse support
-- [ ] Advanced analytics and reporting
-- [ ] Email notifications for demurrage alerts
+## Prioritized Backlog
+
+### P0 - Critical (Completed ✅)
+- [x] System Settings page
+- [x] Enhanced SKU fields
+- [x] PO Edit/Delete/Duplicate
+- [x] Fix empty PO dropdown bug
+
+### P1 - High Priority
+- [ ] Supplier-wise detailed ledger view (with payment history per supplier)
+- [ ] Advanced reporting charts and KPIs enhancement
+- [ ] Mobile responsiveness optimization
+
+### P2 - Medium Priority  
+- [ ] Real-time ExchangeRate-API integration
 - [ ] Batch document upload
-- [ ] Mobile-responsive optimization
+- [ ] Email notifications for demurrage alerts
+
+### P3 - Future Enhancements
+- [ ] Multi-entity/warehouse support
+- [ ] Refactor server.py into modular files (routes, models, db)
+- [ ] Add pytest test suite in /app/backend/tests
+
+## Known Issues
+None - All reported issues have been resolved.
+
+## Changelog
+
+### January 10, 2026
+- Added System Settings page with 3 tabs (Company, Documents, Dropdowns)
+- Added new SKU fields: Category, Adhesive Type, Liner Color, Shipping Mark, Marking
+- Added Edit, Delete, Duplicate functionality to Purchase Orders
+- Added SKU search by name/code when adding items to POs
+- Added Shipping Date field to Purchase Orders
+- Fixed empty PO dropdown in Actual Loading and Financial modules
+- Added Settings navigation item to sidebar (Owner role only)
+- PDF export now respects "Show Duty Rate" setting
+
+### Previous Updates
+- Full CRUD for all master data
+- Excel import/export for all masters
+- PDF export for Purchase Orders
+- Reports & Analytics page
+- All 6 phases implemented (Foundation through ERP Integration)
