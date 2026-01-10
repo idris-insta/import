@@ -2105,6 +2105,167 @@ async def get_import_order(order_id: str, current_user: User = Depends(check_per
     
     return ImportOrder(**order)
 
+# ==================== IMPORT ORDER EDIT/DELETE/DUPLICATE ====================
+
+@api_router.put("/import-orders/{order_id}", response_model=ImportOrder)
+async def update_import_order(
+    order_id: str,
+    order_update: dict,
+    current_user: User = Depends(check_permission(Permission.CREATE_ORDERS.value))
+):
+    """Update an existing import order"""
+    existing = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Prevent updating if already shipped/delivered
+    if existing.get('status') in ['Shipped', 'In Transit', 'Arrived', 'Delivered']:
+        raise HTTPException(status_code=400, detail=f"Cannot edit order with status: {existing.get('status')}")
+    
+    # Update allowed fields
+    allowed_fields = ['po_number', 'supplier_id', 'port_id', 'container_type', 'currency', 
+                      'items', 'status', 'eta', 'shipping_date', 'duty_rate', 'freight_charges', 
+                      'insurance_charges', 'other_charges']
+    
+    update_data = {k: v for k, v in order_update.items() if k in allowed_fields and v is not None}
+    
+    # Recalculate totals if items changed
+    if 'items' in update_data:
+        items = update_data['items']
+        total_quantity = sum(item.get('quantity', 0) for item in items)
+        total_value = sum(item.get('total_value', 0) for item in items)
+        
+        # Calculate weight and CBM from SKUs
+        total_weight = 0
+        total_cbm = 0
+        for item in items:
+            sku = await db.skus.find_one({"id": item.get('sku_id')}, {"_id": 0})
+            if sku:
+                total_weight += item.get('quantity', 0) * sku.get('weight_per_unit', 0)
+                total_cbm += item.get('quantity', 0) * sku.get('cbm_per_unit', 0)
+        
+        update_data['total_quantity'] = total_quantity
+        update_data['total_value'] = total_value
+        update_data['total_weight'] = total_weight
+        update_data['total_cbm'] = total_cbm
+        
+        # Recalculate utilization
+        container = await db.containers.find_one({"container_type": update_data.get('container_type', existing.get('container_type'))}, {"_id": 0})
+        if container:
+            weight_util = (total_weight / container.get('max_weight', 1)) * 100
+            cbm_util = (total_cbm / container.get('max_cbm', 1)) * 100
+            update_data['utilization_percentage'] = round(max(weight_util, cbm_util), 2)
+    
+    update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    await db.import_orders.update_one({"id": order_id}, {"$set": update_data})
+    
+    updated_order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if isinstance(updated_order['created_at'], str):
+        updated_order['created_at'] = datetime.fromisoformat(updated_order['created_at'])
+    if updated_order.get('updated_at') and isinstance(updated_order['updated_at'], str):
+        updated_order['updated_at'] = datetime.fromisoformat(updated_order['updated_at'])
+    
+    return ImportOrder(**updated_order)
+
+@api_router.delete("/import-orders/{order_id}")
+async def delete_import_order(
+    order_id: str,
+    current_user: User = Depends(check_permission(Permission.CREATE_ORDERS.value))
+):
+    """Delete an import order"""
+    existing = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Prevent deleting if already shipped/delivered
+    if existing.get('status') in ['Shipped', 'In Transit', 'Arrived', 'Delivered']:
+        raise HTTPException(status_code=400, detail=f"Cannot delete order with status: {existing.get('status')}")
+    
+    # Delete related records
+    await db.payments.delete_many({"import_order_id": order_id})
+    await db.documents.delete_many({"import_order_id": order_id})
+    await db.actual_loadings.delete_many({"import_order_id": order_id})
+    
+    result = await db.import_orders.delete_one({"id": order_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    return {"message": "Import order deleted successfully"}
+
+@api_router.post("/import-orders/{order_id}/duplicate", response_model=ImportOrder)
+async def duplicate_import_order(
+    order_id: str,
+    new_po_number: str = None,
+    current_user: User = Depends(check_permission(Permission.CREATE_ORDERS.value))
+):
+    """Duplicate an existing import order with a new PO number"""
+    existing = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Generate new PO number if not provided
+    if not new_po_number:
+        base_po = existing.get('po_number', 'PO')
+        new_po_number = f"{base_po}-COPY-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Check if new PO number already exists
+    po_exists = await db.import_orders.find_one({"po_number": new_po_number})
+    if po_exists:
+        raise HTTPException(status_code=400, detail="PO number already exists")
+    
+    # Create new order
+    new_order = {
+        **existing,
+        "id": str(uuid.uuid4()),
+        "po_number": new_po_number,
+        "status": "Draft",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": current_user.id,
+        "eta": None,
+        "shipping_date": None,
+        "demurrage_start": None
+    }
+    
+    await db.import_orders.insert_one(new_order)
+    
+    if isinstance(new_order['created_at'], str):
+        new_order['created_at'] = datetime.fromisoformat(new_order['created_at'])
+    if isinstance(new_order['updated_at'], str):
+        new_order['updated_at'] = datetime.fromisoformat(new_order['updated_at'])
+    
+    return ImportOrder(**new_order)
+
+@api_router.put("/import-orders/{order_id}/status")
+async def update_order_status(
+    order_id: str,
+    status: str,
+    shipping_date: str = None,
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Update order status (for tracking shipped orders)"""
+    existing = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Validate status
+    valid_statuses = ["Draft", "Tentative", "Confirmed", "Loaded", "Shipped", "In Transit", "Arrived", "Delivered", "Cancelled"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    update_data = {
+        "status": status,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if shipping_date:
+        update_data["shipping_date"] = shipping_date
+    
+    await db.import_orders.update_one({"id": order_id}, {"$set": update_data})
+    
+    return {"message": f"Order status updated to {status}"}
+
 # Actual Loading endpoints
 @api_router.post("/actual-loadings", response_model=ActualLoading)
 async def create_actual_loading(loading_data: ActualLoadingCreate, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
