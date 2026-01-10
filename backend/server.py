@@ -2311,7 +2311,9 @@ async def create_actual_loading(loading_data: ActualLoadingCreate, current_user:
     total_variance_value = total_actual_value - total_planned_value
     
     loading = ActualLoading(
-        **loading_data.model_dump(),
+        import_order_id=loading_data.import_order_id,
+        items=loading_data.items,
+        loading_date=loading_data.loading_date or datetime.now(timezone.utc),
         total_planned_quantity=total_planned_quantity,
         total_actual_quantity=total_actual_quantity,
         total_variance_quantity=total_variance_quantity,
