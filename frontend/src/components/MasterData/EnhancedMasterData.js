@@ -230,7 +230,9 @@ const EnhancedMasterData = () => {
     try {
       const payload = {
         ...supplierForm,
-        opening_balance: parseFloat(supplierForm.opening_balance) || 0
+        opening_balance: parseFloat(supplierForm.opening_balance) || 0,
+        payment_terms_days: parseInt(supplierForm.payment_terms_days) || 30,
+        payment_terms_type: supplierForm.payment_terms_type || 'NET'
       };
       
       let response;
