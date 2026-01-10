@@ -825,6 +825,40 @@ const EnhancedMasterData = () => {
             data-testid="supplier-balance-input"
           />
         </div>
+        
+        {/* Payment Terms Section */}
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Payment Terms</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="payment_terms_type">Payment Type</Label>
+              <Select value={supplierForm.payment_terms_type} onValueChange={(value) => setSupplierForm({...supplierForm, payment_terms_type: value})}>
+                <SelectTrigger data-testid="supplier-payment-type-select">
+                  <SelectValue placeholder="Select payment type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NET">NET (Net Days)</SelectItem>
+                  <SelectItem value="COD">COD (Cash on Delivery)</SelectItem>
+                  <SelectItem value="ADVANCE">ADVANCE (Payment in Advance)</SelectItem>
+                  <SelectItem value="LC">LC (Letter of Credit)</SelectItem>
+                  <SelectItem value="TT">TT (Telegraphic Transfer)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payment_terms_days">Payment Days</Label>
+              <Input
+                id="payment_terms_days"
+                type="number"
+                value={supplierForm.payment_terms_days}
+                onChange={(e) => setSupplierForm({...supplierForm, payment_terms_days: e.target.value})}
+                placeholder="30"
+                data-testid="supplier-payment-days-input"
+              />
+              <p className="text-xs text-gray-500">Days until payment is due</p>
+            </div>
+          </div>
+        </div>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={() => { resetForms(); setDialogOpen(false); }} data-testid="cancel-supplier-btn">
