@@ -176,6 +176,22 @@ None - All reported issues have been resolved.
 
 ## Changelog
 
+### January 10, 2026 (Session 3)
+- Fixed Dashboard Financial Overview - now shows actual payment data:
+  - Total Paid, Balance Due, FX Exposure, Supplier Balances
+  - Currency Exposure card with order counts
+  - Supplier Balances table with order value, paid, balance
+- Added Container Tracking features:
+  - New "Tracking" tab in Reports with full container list
+  - Container Number, Vessel Name, BL Number, ETD, ETA, Total Packages fields
+  - View Container Contents dialog showing all items in container
+  - Edit Tracking dialog to update status and tracking info
+  - Status options: Draft → Tentative → Confirmed → Loaded → Shipped → In Transit → Arrived → Delivered
+- New backend APIs:
+  - `/api/import-orders/{id}/tracking` (PUT) - Update tracking info
+  - `/api/reports/container-tracking` - Full container tracking report with contents
+  - Updated `/api/dashboard/financial-overview` with actual data
+
 ### January 10, 2026 (Session 2)
 - Added comprehensive Reports & Analytics page with 4 tabs:
   - **Supplier-wise:** Summary cards + supplier table with Ledger button
