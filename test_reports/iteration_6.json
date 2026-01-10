@@ -1,0 +1,97 @@
+{
+  "summary": "Comprehensive testing of new Reports & Analytics features completed. All 4 report tabs working: Supplier-wise (with Ledger dialog), Container-wise, Payments (Made/Due), Notifications. Supplier Master Data Payment Terms fields verified. Fixed missing supplier_id in API response.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/reports/supplier-wise-summary",
+        "issue": "Missing supplier_id in response - FIXED",
+        "priority": "FIXED"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/tests/test_reports_features.py",
+    "/app/test_reports/pytest/pytest_reports_features.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "All new report APIs working correctly with proper data structures",
+    "Supplier Ledger shows complete transaction history with running balance",
+    "Payment Terms fields (type and days) properly integrated in Supplier Master",
+    "Container-wise report correctly groups by container type and status",
+    "Payments summary shows both made and due payments with overdue highlighting"
+  ],
+  "updated_files": [
+    "/app/backend/server.py - Added supplier_id to supplier-wise-summary response"
+  ],
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "email": "owner@icms.com",
+    "password": "owner123"
+  },
+  "seed_data_creation": "No new seed data created - used existing 5 orders, 10 payments, 2 suppliers",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All Reports & Analytics features verified working. Reports page has 4 tabs: Supplier-wise (with Ledger button), Container-wise, Payments, Notifications. Supplier Master Data has Payment Terms section with Payment Type dropdown and Payment Days input.",
+  "features_tested": {
+    "reports_supplier_wise": {
+      "status": "PASS",
+      "details": "Summary cards (Total Suppliers, Pending Value, Shipped Value, Balance Due), Supplier table with Ledger button"
+    },
+    "reports_ledger_dialog": {
+      "status": "PASS",
+      "details": "Shows Opening Balance, Total Orders, Total Paid, Current Balance, Payment Terms, Full ledger table with running balance"
+    },
+    "reports_container_wise": {
+      "status": "PASS",
+      "details": "Summary cards (Pending, Shipped, In Transit, Delivered), Container type breakdown (20FT, 40HC) with order lists"
+    },
+    "reports_payments": {
+      "status": "PASS",
+      "details": "Summary cards (Total Paid, Total Due, Overdue, Net Position), Payments Due table, Payments Made table"
+    },
+    "reports_notifications": {
+      "status": "PASS",
+      "details": "Summary cards (Critical, High Priority, Medium, Total Alerts), Notification list with severity badges"
+    },
+    "supplier_payment_terms": {
+      "status": "PASS",
+      "details": "Payment Terms section in Add/Edit Supplier dialog with Payment Type dropdown (NET, COD, ADVANCE, LC, TT) and Payment Days input"
+    }
+  },
+  "tests_performed": {
+    "backend_api_tests": [
+      {"test": "GET /api/reports/supplier-wise-summary", "result": "PASS"},
+      {"test": "GET /api/reports/container-wise", "result": "PASS"},
+      {"test": "GET /api/reports/supplier-ledger/{id}", "result": "PASS"},
+      {"test": "GET /api/reports/payments-summary", "result": "PASS"},
+      {"test": "GET /api/reports/notifications", "result": "PASS"},
+      {"test": "Supplier payment_terms_days field", "result": "PASS"},
+      {"test": "Supplier payment_terms_type field", "result": "PASS"},
+      {"test": "Create supplier with payment terms", "result": "PASS"},
+      {"test": "Update supplier payment terms", "result": "PASS"}
+    ],
+    "frontend_e2e_tests": [
+      {"test": "Login with owner@icms.com", "result": "PASS"},
+      {"test": "Navigate to Reports page", "result": "PASS"},
+      {"test": "Supplier-wise tab displays correctly", "result": "PASS"},
+      {"test": "Ledger button opens dialog", "result": "PASS"},
+      {"test": "Ledger dialog shows transactions", "result": "PASS"},
+      {"test": "Container-wise tab displays correctly", "result": "PASS"},
+      {"test": "Payments tab shows Made/Due tables", "result": "PASS"},
+      {"test": "Notifications tab displays correctly", "result": "PASS"},
+      {"test": "Master Data > Suppliers tab", "result": "PASS"},
+      {"test": "Add Supplier dialog has Payment Terms", "result": "PASS"},
+      {"test": "Edit Supplier dialog has Payment Terms", "result": "PASS"}
+    ]
+  }
+}
