@@ -215,6 +215,45 @@ class SKUUpdate(BaseModel):
     cbm_per_unit: Optional[float] = None
     unit_cost: Optional[float] = None
     category: Optional[str] = None
+    adhesive_type: Optional[str] = None
+    liner_color: Optional[str] = None
+    shipping_mark: Optional[str] = None
+    marking: Optional[str] = None
+
+# System Settings Models
+class SystemSettings(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default="system_settings")
+    company_name: str = "ICMS Company"
+    company_address: str = ""
+    company_phone: str = ""
+    company_email: str = ""
+    logo_url: Optional[str] = None
+    header_text: str = "PURCHASE ORDER"
+    footer_text: str = "Thank you for your business"
+    show_duty_rate_on_pdf: bool = False
+    # Dropdown options
+    categories: List[str] = Field(default_factory=lambda: ["Raw Materials", "Finished Goods", "Packaging", "Components", "Other"])
+    adhesive_types: List[str] = Field(default_factory=lambda: ["Acrylic", "Rubber", "Silicone", "Hot Melt", "Water Based", "Solvent Based"])
+    liner_colors: List[str] = Field(default_factory=lambda: ["Clear", "White", "Blue", "Red", "Green", "Yellow", "Black", "Brown"])
+    shipping_marks: List[str] = Field(default_factory=lambda: ["Standard", "Fragile", "This Side Up", "Handle with Care", "Keep Dry"])
+    order_statuses: List[str] = Field(default_factory=lambda: ["Draft", "Tentative", "Confirmed", "Loaded", "Shipped", "In Transit", "Arrived", "Delivered", "Cancelled"])
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class SystemSettingsUpdate(BaseModel):
+    company_name: Optional[str] = None
+    company_address: Optional[str] = None
+    company_phone: Optional[str] = None
+    company_email: Optional[str] = None
+    logo_url: Optional[str] = None
+    header_text: Optional[str] = None
+    footer_text: Optional[str] = None
+    show_duty_rate_on_pdf: Optional[bool] = None
+    categories: Optional[List[str]] = None
+    adhesive_types: Optional[List[str]] = None
+    liner_colors: Optional[List[str]] = None
+    shipping_marks: Optional[List[str]] = None
+    order_statuses: Optional[List[str]] = None
 
 class Supplier(BaseModel):
     model_config = ConfigDict(extra="ignore")
