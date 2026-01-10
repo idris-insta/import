@@ -164,7 +164,9 @@ const EnhancedMasterData = () => {
         address: item.address || '',
         description: item.description || '',
         country: item.country || '',
-        opening_balance: item.opening_balance?.toString() || ''
+        opening_balance: item.opening_balance?.toString() || '',
+        payment_terms_days: item.payment_terms_days?.toString() || '30',
+        payment_terms_type: item.payment_terms_type || 'NET'
       });
       setActiveTab('suppliers');
     } else if (type === 'port') {
