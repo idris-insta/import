@@ -180,6 +180,10 @@ class SKU(BaseModel):
     cbm_per_unit: float  # cubic meter
     unit_cost: Optional[float] = None
     category: Optional[str] = None
+    adhesive_type: Optional[str] = None
+    liner_color: Optional[str] = None
+    shipping_mark: Optional[str] = None
+    marking: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SKUCreate(BaseModel):
@@ -194,6 +198,10 @@ class SKUCreate(BaseModel):
     cbm_per_unit: float
     unit_cost: Optional[float] = None
     category: Optional[str] = None
+    adhesive_type: Optional[str] = None
+    liner_color: Optional[str] = None
+    shipping_mark: Optional[str] = None
+    marking: Optional[str] = None
 
 class SKUUpdate(BaseModel):
     sku_code: Optional[str] = None
