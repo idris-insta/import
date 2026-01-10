@@ -268,6 +268,8 @@ class Supplier(BaseModel):
     country: Optional[str] = None
     opening_balance: float = 0.0
     current_balance: float = 0.0
+    payment_terms_days: int = 30  # Payment due in X days
+    payment_terms_type: str = "NET"  # NET, COD, ADVANCE, LC
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class SupplierCreate(BaseModel):
@@ -280,6 +282,8 @@ class SupplierCreate(BaseModel):
     description: Optional[str] = None
     country: Optional[str] = None
     opening_balance: float = 0.0
+    payment_terms_days: int = 30
+    payment_terms_type: str = "NET"
 
 class SupplierUpdate(BaseModel):
     name: Optional[str] = None
@@ -291,6 +295,8 @@ class SupplierUpdate(BaseModel):
     description: Optional[str] = None
     country: Optional[str] = None
     opening_balance: Optional[float] = None
+    payment_terms_days: Optional[int] = None
+    payment_terms_type: Optional[str] = None
 
 class Port(BaseModel):
     model_config = ConfigDict(extra="ignore")
