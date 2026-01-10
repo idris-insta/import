@@ -42,7 +42,18 @@ const EnhancedMasterData = () => {
     weight_per_unit: '',
     cbm_per_unit: '',
     unit_cost: '',
-    category: ''
+    category: '',
+    adhesive_type: '',
+    liner_color: '',
+    shipping_mark: '',
+    marking: ''
+  });
+  
+  const [dropdownOptions, setDropdownOptions] = useState({
+    categories: [],
+    adhesive_types: [],
+    liner_colors: [],
+    shipping_marks: []
   });
   
   const [supplierForm, setSupplierForm] = useState({
@@ -75,7 +86,17 @@ const EnhancedMasterData = () => {
 
   useEffect(() => {
     fetchAllData();
+    fetchDropdownOptions();
   }, []);
+  
+  const fetchDropdownOptions = async () => {
+    try {
+      const response = await axios.get(`${API}/settings/dropdown-options`);
+      setDropdownOptions(response.data);
+    } catch (error) {
+      console.error('Error fetching dropdown options:', error);
+    }
+  };
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -100,7 +121,7 @@ const EnhancedMasterData = () => {
   };
 
   const resetForms = () => {
-    setSkuForm({ sku_code: '', description: '', color: '', hsn_code: '', micron: '', width_mm: '', length_m: '', weight_per_unit: '', cbm_per_unit: '', unit_cost: '', category: '' });
+    setSkuForm({ sku_code: '', description: '', color: '', hsn_code: '', micron: '', width_mm: '', length_m: '', weight_per_unit: '', cbm_per_unit: '', unit_cost: '', category: '', adhesive_type: '', liner_color: '', shipping_mark: '', marking: '' });
     setSupplierForm({ name: '', code: '', base_currency: '', contact_email: '', contact_phone: '', address: '', description: '', country: '', opening_balance: '' });
     setPortForm({ name: '', code: '', country: '', transit_days: '', demurrage_free_days: '', demurrage_rate: '' });
     setContainerForm({ container_type: '', max_weight: '', max_cbm: '', freight_rate: '' });
@@ -124,7 +145,11 @@ const EnhancedMasterData = () => {
         weight_per_unit: item.weight_per_unit?.toString() || '',
         cbm_per_unit: item.cbm_per_unit?.toString() || '',
         unit_cost: item.unit_cost?.toString() || '',
-        category: item.category || ''
+        category: item.category || '',
+        adhesive_type: item.adhesive_type || '',
+        liner_color: item.liner_color || '',
+        shipping_mark: item.shipping_mark || '',
+        marking: item.marking || ''
       });
       setActiveTab('skus');
     } else if (type === 'supplier') {
@@ -171,7 +196,11 @@ const EnhancedMasterData = () => {
         micron: skuForm.micron ? parseFloat(skuForm.micron) : null,
         width_mm: skuForm.width_mm ? parseFloat(skuForm.width_mm) : null,
         length_m: skuForm.length_m ? parseFloat(skuForm.length_m) : null,
-        unit_cost: skuForm.unit_cost ? parseFloat(skuForm.unit_cost) : null
+        unit_cost: skuForm.unit_cost ? parseFloat(skuForm.unit_cost) : null,
+        adhesive_type: skuForm.adhesive_type || null,
+        liner_color: skuForm.liner_color || null,
+        shipping_mark: skuForm.shipping_mark || null,
+        marking: skuForm.marking || null
       };
       
       let response;
@@ -610,6 +639,64 @@ const EnhancedMasterData = () => {
               placeholder="Cost per unit"
               data-testid="sku-cost-input"
             />
+          </div>
+        </div>
+        
+        {/* New Product Attributes Section */}
+        <div className="border-t pt-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Product Attributes</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="adhesive_type">Adhesive Type</Label>
+              <Select value={skuForm.adhesive_type} onValueChange={(value) => setSkuForm({...skuForm, adhesive_type: value})}>
+                <SelectTrigger data-testid="sku-adhesive-select">
+                  <SelectValue placeholder="Select adhesive type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dropdownOptions.adhesive_types?.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="liner_color">Liner Color</Label>
+              <Select value={skuForm.liner_color} onValueChange={(value) => setSkuForm({...skuForm, liner_color: value})}>
+                <SelectTrigger data-testid="sku-liner-color-select">
+                  <SelectValue placeholder="Select liner color" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dropdownOptions.liner_colors?.map((color) => (
+                    <SelectItem key={color} value={color}>{color}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="shipping_mark">Shipping Mark</Label>
+              <Select value={skuForm.shipping_mark} onValueChange={(value) => setSkuForm({...skuForm, shipping_mark: value})}>
+                <SelectTrigger data-testid="sku-shipping-mark-select">
+                  <SelectValue placeholder="Select shipping mark" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dropdownOptions.shipping_marks?.map((mark) => (
+                    <SelectItem key={mark} value={mark}>{mark}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="marking">Marking / Notes</Label>
+              <Input
+                id="marking"
+                value={skuForm.marking}
+                onChange={(e) => setSkuForm({...skuForm, marking: e.target.value})}
+                placeholder="e.g., ORDER NO MARKING"
+                data-testid="sku-marking-input"
+              />
+            </div>
           </div>
         </div>
       </div>
