@@ -472,7 +472,7 @@ class ActualLoading(BaseModel):
     total_actual_value: float
     total_variance_value: float
     is_locked: bool = False
-    loading_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    loading_date: Optional[datetime] = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
