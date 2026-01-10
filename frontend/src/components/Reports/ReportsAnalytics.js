@@ -4,12 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
 import { toast } from 'sonner';
 import { 
   Download, FileSpreadsheet, TrendingUp, Users, Package, Ship,
   DollarSign, BarChart3, Loader2, AlertTriangle, CheckCircle,
-  Clock, Calendar, Bell, CreditCard, Truck, Eye, ArrowRight
+  Clock, Calendar, Bell, CreditCard, Truck, Eye, Edit, Box, Anchor, MapPin
 } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -19,11 +22,24 @@ const ReportsAnalytics = () => {
   const [activeTab, setActiveTab] = useState('supplier-summary');
   const [supplierSummary, setSupplierSummary] = useState(null);
   const [containerReport, setContainerReport] = useState(null);
+  const [containerTracking, setContainerTracking] = useState(null);
   const [paymentsReport, setPaymentsReport] = useState(null);
   const [notifications, setNotifications] = useState(null);
   const [supplierLedger, setSupplierLedger] = useState(null);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
   const [ledgerDialogOpen, setLedgerDialogOpen] = useState(false);
+  const [containerDetailDialog, setContainerDetailDialog] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState(null);
+  const [editTrackingDialog, setEditTrackingDialog] = useState(false);
+  const [trackingForm, setTrackingForm] = useState({
+    status: '',
+    container_number: '',
+    vessel_name: '',
+    bl_number: '',
+    etd: '',
+    eta: '',
+    total_packages: ''
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -39,6 +55,9 @@ const ReportsAnalytics = () => {
       } else if (activeTab === 'container-wise') {
         const response = await axios.get(`${API}/reports/container-wise`);
         setContainerReport(response.data);
+      } else if (activeTab === 'container-tracking') {
+        const response = await axios.get(`${API}/reports/container-tracking`);
+        setContainerTracking(response.data);
       } else if (activeTab === 'payments') {
         const response = await axios.get(`${API}/reports/payments-summary`);
         setPaymentsReport(response.data);
@@ -66,6 +85,52 @@ const ReportsAnalytics = () => {
       toast.error('Failed to load supplier ledger');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewContainerDetails = (container) => {
+    setSelectedContainer(container);
+    setContainerDetailDialog(true);
+  };
+
+  const handleEditTracking = (container) => {
+    setSelectedContainer(container);
+    setTrackingForm({
+      status: container.status || '',
+      container_number: container.container_number || '',
+      vessel_name: container.vessel_name || '',
+      bl_number: container.bl_number || '',
+      etd: container.etd ? container.etd.split('T')[0] : '',
+      eta: container.eta ? container.eta.split('T')[0] : '',
+      total_packages: container.total_packages?.toString() || ''
+    });
+    setEditTrackingDialog(true);
+  };
+
+  const handleSaveTracking = async () => {
+    try {
+      // Update status
+      if (trackingForm.status && trackingForm.status !== selectedContainer.status) {
+        await axios.put(`${API}/import-orders/${selectedContainer.order_id}/status?status=${trackingForm.status}`);
+      }
+      
+      // Update tracking info
+      const trackingParams = new URLSearchParams();
+      if (trackingForm.container_number) trackingParams.append('container_number', trackingForm.container_number);
+      if (trackingForm.vessel_name) trackingParams.append('vessel_name', trackingForm.vessel_name);
+      if (trackingForm.bl_number) trackingParams.append('bl_number', trackingForm.bl_number);
+      if (trackingForm.etd) trackingParams.append('etd', new Date(trackingForm.etd).toISOString());
+      if (trackingForm.eta) trackingParams.append('eta', new Date(trackingForm.eta).toISOString());
+      if (trackingForm.total_packages) trackingParams.append('total_packages', trackingForm.total_packages);
+      
+      await axios.put(`${API}/import-orders/${selectedContainer.order_id}/tracking?${trackingParams.toString()}`);
+      
+      toast.success('Container tracking updated successfully');
+      setEditTrackingDialog(false);
+      fetchData();
+    } catch (error) {
+      console.error('Error updating tracking:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update tracking');
     }
   };
 
@@ -106,12 +171,26 @@ const ReportsAnalytics = () => {
     return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const getStatusColor = (status) => {
+    const colors = {
+      'Draft': 'bg-gray-100 text-gray-800',
+      'Tentative': 'bg-yellow-100 text-yellow-800',
+      'Confirmed': 'bg-blue-100 text-blue-800',
+      'Loaded': 'bg-purple-100 text-purple-800',
+      'Shipped': 'bg-indigo-100 text-indigo-800',
+      'In Transit': 'bg-cyan-100 text-cyan-800',
+      'Arrived': 'bg-orange-100 text-orange-800',
+      'Delivered': 'bg-green-100 text-green-800',
+      'Cancelled': 'bg-red-100 text-red-800'
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
   const renderSupplierSummary = () => {
     if (!supplierSummary) return null;
 
     return (
       <div className="space-y-6">
-        {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4">
@@ -124,7 +203,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -136,7 +214,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -148,7 +225,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -162,7 +238,6 @@ const ReportsAnalytics = () => {
           </Card>
         </div>
 
-        {/* Supplier Table */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-4">
             <CardTitle className="flex items-center gap-2">
@@ -236,20 +311,159 @@ const ReportsAnalytics = () => {
     );
   };
 
-  const renderContainerWise = () => {
-    if (!containerReport) return null;
+  const renderContainerTracking = () => {
+    if (!containerTracking) return null;
 
-    const { containers, totals } = containerReport;
+    const { containers, totals } = containerTracking;
 
     return (
       <div className="space-y-6">
         {/* Summary Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card className="bg-gradient-to-br from-gray-50 to-gray-100 border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600 font-medium">Total</p>
+                  <p className="text-2xl font-bold text-gray-900">{totals?.total_containers || 0}</p>
+                </div>
+                <Box className="w-8 h-8 text-gray-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-yellow-600 font-medium">Pending</p>
+                  <p className="text-2xl font-bold text-yellow-900">{totals?.pending || 0}</p>
+                </div>
+                <Clock className="w-8 h-8 text-yellow-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-blue-600 font-medium">Shipped</p>
+                  <p className="text-2xl font-bold text-blue-900">{totals?.shipped || 0}</p>
+                </div>
+                <Ship className="w-8 h-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-purple-600 font-medium">In Transit</p>
+                  <p className="text-2xl font-bold text-purple-900">{totals?.in_transit || 0}</p>
+                </div>
+                <Truck className="w-8 h-8 text-purple-500" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-green-600 font-medium">Delivered</p>
+                  <p className="text-2xl font-bold text-green-900">{totals?.delivered || 0}</p>
+                </div>
+                <CheckCircle className="w-8 h-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Container List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Anchor className="w-5 h-5" />
+              Container Tracking ({containers?.length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-800 text-white">
+                    <th className="p-3 text-left">Container #</th>
+                    <th className="p-3 text-left">PO Number</th>
+                    <th className="p-3 text-left">Supplier</th>
+                    <th className="p-3 text-center">Type</th>
+                    <th className="p-3 text-center">Status</th>
+                    <th className="p-3 text-center">Packages</th>
+                    <th className="p-3 text-center">ETD</th>
+                    <th className="p-3 text-center">ETA</th>
+                    <th className="p-3 text-right">Value</th>
+                    <th className="p-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {containers?.map((container, idx) => (
+                    <tr key={idx} className={`border-b ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-blue-50`}>
+                      <td className="p-3">
+                        <div className="font-medium">{container.container_number}</div>
+                        {container.vessel_name && <div className="text-xs text-gray-500">{container.vessel_name}</div>}
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{container.po_number}</div>
+                        {container.bl_number && <div className="text-xs text-gray-500">BL: {container.bl_number}</div>}
+                      </td>
+                      <td className="p-3">{container.supplier_name}</td>
+                      <td className="p-3 text-center">
+                        <Badge variant="outline">{container.container_type}</Badge>
+                      </td>
+                      <td className="p-3 text-center">
+                        <Badge className={getStatusColor(container.status)}>{container.status}</Badge>
+                      </td>
+                      <td className="p-3 text-center font-medium">{container.total_packages}</td>
+                      <td className="p-3 text-center text-sm">{formatDate(container.etd)}</td>
+                      <td className="p-3 text-center">
+                        <div className="text-sm">{formatDate(container.eta)}</div>
+                        {container.days_until_arrival !== undefined && (
+                          <div className={`text-xs ${container.days_until_arrival <= 0 ? 'text-green-600' : container.days_until_arrival <= 3 ? 'text-orange-600' : 'text-gray-500'}`}>
+                            {container.days_until_arrival <= 0 ? 'Arrived' : `${container.days_until_arrival}d left`}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 text-right font-medium">{container.currency} {container.total_value?.toLocaleString()}</td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleViewContainerDetails(container)} title="View Contents">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditTracking(container)} title="Edit Tracking">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderContainerWise = () => {
+    if (!containerReport) return null;
+    const { containers, totals } = containerReport;
+
+    return (
+      <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-yellow-600 font-medium">Pending Containers</p>
+                  <p className="text-xs text-yellow-600 font-medium">Pending</p>
                   <p className="text-2xl font-bold text-yellow-900">{totals?.total_pending || 0}</p>
                   <p className="text-xs text-yellow-600">{formatCurrency(totals?.pending_value)}</p>
                 </div>
@@ -257,7 +471,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -270,7 +483,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -283,7 +495,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -298,7 +509,6 @@ const ReportsAnalytics = () => {
           </Card>
         </div>
 
-        {/* Container Type Breakdown */}
         {Object.entries(containers || {}).map(([containerType, data]) => (
           <Card key={containerType}>
             <CardHeader>
@@ -327,7 +537,6 @@ const ReportsAnalytics = () => {
                 </div>
               </div>
               
-              {/* Orders List */}
               {data.pending?.orders?.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-medium text-gray-700 mb-2">Pending Orders</h4>
@@ -356,12 +565,10 @@ const ReportsAnalytics = () => {
 
   const renderPayments = () => {
     if (!paymentsReport) return null;
-
     const { payments_made, payments_due, summary } = paymentsReport;
 
     return (
       <div className="space-y-6">
-        {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
             <CardContent className="p-4">
@@ -375,7 +582,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -388,7 +594,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -401,14 +606,13 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-blue-600 font-medium">Net Position</p>
                   <p className="text-2xl font-bold text-blue-900">
-                    {formatCurrency(summary?.total_paid - summary?.total_due, 'INR')}
+                    {formatCurrency((summary?.total_paid || 0) - (summary?.total_due || 0), 'INR')}
                   </p>
                 </div>
                 <BarChart3 className="w-8 h-8 text-blue-500" />
@@ -445,9 +649,7 @@ const ReportsAnalytics = () => {
                     <tr key={idx} className={`border-b ${payment.is_overdue ? 'bg-red-50' : idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                       <td className="p-3 font-medium">{payment.po_number}</td>
                       <td className="p-3">{payment.supplier_name}</td>
-                      <td className="p-3 text-center">
-                        <Badge variant="outline">{payment.status}</Badge>
-                      </td>
+                      <td className="p-3 text-center"><Badge variant="outline">{payment.status}</Badge></td>
                       <td className="p-3 text-right">{payment.currency} {payment.order_value?.toLocaleString()}</td>
                       <td className="p-3 text-right text-green-600">{payment.currency} {payment.paid_amount?.toLocaleString()}</td>
                       <td className="p-3 text-right font-bold text-red-600">{payment.currency} {payment.balance_due?.toLocaleString()}</td>
@@ -504,9 +706,7 @@ const ReportsAnalytics = () => {
                       <td className="p-3">{payment.supplier_name}</td>
                       <td className="p-3 text-right">{payment.currency} {payment.amount?.toLocaleString()}</td>
                       <td className="p-3 text-right font-medium">₹ {payment.inr_amount?.toLocaleString()}</td>
-                      <td className="p-3 text-center">
-                        <Badge variant="outline">{payment.payment_type}</Badge>
-                      </td>
+                      <td className="p-3 text-center"><Badge variant="outline">{payment.payment_type}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
@@ -520,12 +720,10 @@ const ReportsAnalytics = () => {
 
   const renderNotifications = () => {
     if (!notifications) return null;
-
     const { notifications: alerts, counts } = notifications;
 
     return (
       <div className="space-y-6">
-        {/* Notification Summary */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className={`${counts?.critical > 0 ? 'bg-red-100 border-red-300 animate-pulse' : 'bg-gray-100'}`}>
             <CardContent className="p-4">
@@ -538,7 +736,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className={`${counts?.high > 0 ? 'bg-orange-100 border-orange-300' : 'bg-gray-100'}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -550,7 +747,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className={`${counts?.medium > 0 ? 'bg-yellow-100 border-yellow-300' : 'bg-gray-100'}`}>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -562,7 +758,6 @@ const ReportsAnalytics = () => {
               </div>
             </CardContent>
           </Card>
-          
           <Card className="bg-blue-50 border-blue-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -576,7 +771,6 @@ const ReportsAnalytics = () => {
           </Card>
         </div>
 
-        {/* Notifications List */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -641,7 +835,6 @@ const ReportsAnalytics = () => {
         
         {supplierLedger && (
           <div className="space-y-4">
-            {/* Supplier Info */}
             <div className="grid grid-cols-4 gap-4">
               <Card className="bg-blue-50">
                 <CardContent className="p-3">
@@ -680,7 +873,6 @@ const ReportsAnalytics = () => {
               </Card>
             </div>
 
-            {/* Payment Terms */}
             <div className="flex items-center gap-4 p-3 bg-gray-100 rounded-lg">
               <Calendar className="w-5 h-5 text-gray-500" />
               <span className="text-sm">
@@ -688,7 +880,6 @@ const ReportsAnalytics = () => {
               </span>
             </div>
 
-            {/* Ledger Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -731,7 +922,196 @@ const ReportsAnalytics = () => {
     </Dialog>
   );
 
-  if (loading && !supplierSummary && !containerReport && !paymentsReport && !notifications) {
+  const renderContainerDetailDialog = () => (
+    <Dialog open={containerDetailDialog} onOpenChange={setContainerDetailDialog}>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto" data-testid="container-detail-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Box className="w-5 h-5" />
+            Container Contents - {selectedContainer?.container_number}
+          </DialogTitle>
+        </DialogHeader>
+        
+        {selectedContainer && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              <Card className="bg-blue-50">
+                <CardContent className="p-3">
+                  <p className="text-xs text-blue-600">Container Type</p>
+                  <p className="text-lg font-bold text-blue-900">{selectedContainer.container_type}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-purple-50">
+                <CardContent className="p-3">
+                  <p className="text-xs text-purple-600">Total Packages</p>
+                  <p className="text-lg font-bold text-purple-900">{selectedContainer.total_packages}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-50">
+                <CardContent className="p-3">
+                  <p className="text-xs text-green-600">Total Quantity</p>
+                  <p className="text-lg font-bold text-green-900">{selectedContainer.total_quantity?.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-yellow-50">
+                <CardContent className="p-3">
+                  <p className="text-xs text-yellow-600">Utilization</p>
+                  <p className="text-lg font-bold text-yellow-900">{selectedContainer.utilization_percentage?.toFixed(1)}%</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 p-3 bg-gray-100 rounded-lg text-sm">
+              <div><strong>Weight:</strong> {selectedContainer.total_weight?.toFixed(2)} KG</div>
+              <div><strong>CBM:</strong> {selectedContainer.total_cbm?.toFixed(3)}</div>
+              <div><strong>Value:</strong> {selectedContainer.currency} {selectedContainer.total_value?.toLocaleString()}</div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Items in Container ({selectedContainer.items?.length || 0})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="p-2 text-left">SKU</th>
+                        <th className="p-2 text-left">Description</th>
+                        <th className="p-2 text-left">Size</th>
+                        <th className="p-2 text-left">Adhesive</th>
+                        <th className="p-2 text-left">Liner</th>
+                        <th className="p-2 text-right">Qty</th>
+                        <th className="p-2 text-right">Unit Price</th>
+                        <th className="p-2 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedContainer.items?.map((item, idx) => (
+                        <tr key={idx} className={`border-b ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                          <td className="p-2 font-medium">{item.sku_code}</td>
+                          <td className="p-2 text-xs">{item.description?.slice(0, 40)}</td>
+                          <td className="p-2">{item.size || '-'}</td>
+                          <td className="p-2">{item.adhesive_type || '-'}</td>
+                          <td className="p-2">{item.liner_color || '-'}</td>
+                          <td className="p-2 text-right">{item.quantity}</td>
+                          <td className="p-2 text-right">{selectedContainer.currency} {item.unit_price}</td>
+                          <td className="p-2 text-right font-medium">{selectedContainer.currency} {item.total_value?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+
+  const renderEditTrackingDialog = () => (
+    <Dialog open={editTrackingDialog} onOpenChange={setEditTrackingDialog}>
+      <DialogContent className="max-w-md" data-testid="edit-tracking-dialog">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Edit className="w-5 h-5" />
+            Edit Tracking - {selectedContainer?.po_number}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={trackingForm.status} onValueChange={(v) => setTrackingForm({...trackingForm, status: v})}>
+              <SelectTrigger data-testid="tracking-status-select">
+                <SelectValue placeholder="Select status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Draft">Draft</SelectItem>
+                <SelectItem value="Tentative">Tentative</SelectItem>
+                <SelectItem value="Confirmed">Confirmed</SelectItem>
+                <SelectItem value="Loaded">Loaded</SelectItem>
+                <SelectItem value="Shipped">Shipped</SelectItem>
+                <SelectItem value="In Transit">In Transit</SelectItem>
+                <SelectItem value="Arrived">Arrived</SelectItem>
+                <SelectItem value="Delivered">Delivered</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Container Number</Label>
+            <Input
+              value={trackingForm.container_number}
+              onChange={(e) => setTrackingForm({...trackingForm, container_number: e.target.value})}
+              placeholder="e.g., MSKU1234567"
+              data-testid="tracking-container-input"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Vessel Name</Label>
+            <Input
+              value={trackingForm.vessel_name}
+              onChange={(e) => setTrackingForm({...trackingForm, vessel_name: e.target.value})}
+              placeholder="e.g., Ever Given"
+              data-testid="tracking-vessel-input"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>BL Number</Label>
+            <Input
+              value={trackingForm.bl_number}
+              onChange={(e) => setTrackingForm({...trackingForm, bl_number: e.target.value})}
+              placeholder="Bill of Lading Number"
+              data-testid="tracking-bl-input"
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>ETD (Departure)</Label>
+              <Input
+                type="date"
+                value={trackingForm.etd}
+                onChange={(e) => setTrackingForm({...trackingForm, etd: e.target.value})}
+                data-testid="tracking-etd-input"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>ETA (Arrival)</Label>
+              <Input
+                type="date"
+                value={trackingForm.eta}
+                onChange={(e) => setTrackingForm({...trackingForm, eta: e.target.value})}
+                data-testid="tracking-eta-input"
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Total Packages</Label>
+            <Input
+              type="number"
+              value={trackingForm.total_packages}
+              onChange={(e) => setTrackingForm({...trackingForm, total_packages: e.target.value})}
+              placeholder="Number of packages"
+              data-testid="tracking-packages-input"
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEditTrackingDialog(false)}>Cancel</Button>
+          <Button onClick={handleSaveTracking} data-testid="save-tracking-btn">Save Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (loading && !supplierSummary && !containerReport && !containerTracking && !paymentsReport && !notifications) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin" />
@@ -745,19 +1125,23 @@ const ReportsAnalytics = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports & Analytics</h1>
-          <p className="text-sm text-gray-600 mt-1">Comprehensive supplier-wise and container-wise reports</p>
+          <p className="text-sm text-gray-600 mt-1">Comprehensive supplier-wise, container-wise reports with tracking</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="supplier-summary" data-testid="tab-supplier-summary">
             <Users className="w-4 h-4 mr-2" />
-            Supplier-wise
+            Suppliers
           </TabsTrigger>
           <TabsTrigger value="container-wise" data-testid="tab-container-wise">
             <Package className="w-4 h-4 mr-2" />
-            Container-wise
+            Containers
+          </TabsTrigger>
+          <TabsTrigger value="container-tracking" data-testid="tab-container-tracking">
+            <MapPin className="w-4 h-4 mr-2" />
+            Tracking
           </TabsTrigger>
           <TabsTrigger value="payments" data-testid="tab-payments">
             <CreditCard className="w-4 h-4 mr-2" />
@@ -765,7 +1149,7 @@ const ReportsAnalytics = () => {
           </TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">
             <Bell className="w-4 h-4 mr-2" />
-            Notifications
+            Alerts
             {notifications?.counts?.critical > 0 && (
               <Badge className="ml-2 bg-red-500 animate-pulse">{notifications.counts.critical}</Badge>
             )}
@@ -780,6 +1164,10 @@ const ReportsAnalytics = () => {
           {renderContainerWise()}
         </TabsContent>
 
+        <TabsContent value="container-tracking" className="mt-6">
+          {renderContainerTracking()}
+        </TabsContent>
+
         <TabsContent value="payments" className="mt-6">
           {renderPayments()}
         </TabsContent>
@@ -790,6 +1178,8 @@ const ReportsAnalytics = () => {
       </Tabs>
 
       {renderLedgerDialog()}
+      {renderContainerDetailDialog()}
+      {renderEditTrackingDialog()}
     </div>
   );
 };
