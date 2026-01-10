@@ -10,6 +10,7 @@ import ActualLoading from './components/ActualLoading/ActualLoading';
 import FinancialDashboard from './components/Financial/FinancialDashboard';
 import DocumentVault from './components/DocumentVault/DocumentVault';
 import ReportsAnalytics from './components/Reports/ReportsAnalytics';
+import SystemSettings from './components/Settings/SystemSettings';
 import EnhancedSidebar from './components/Layout/EnhancedSidebar';
 import Header from './components/Layout/Header';
 import './App.css';
@@ -118,6 +119,7 @@ function App() {
                         <Route path="/financial" element={<FinancialDashboard />} />
                         <Route path="/documents" element={<DocumentVault />} />
                         <Route path="/reports" element={<ReportsAnalytics />} />
+                        <Route path="/settings" element={<SystemSettings />} />
                       </Routes>
                     </main>
                   </div>

@@ -41,7 +41,7 @@ const ActualLoading = () => {
       ]);
       
       setLoadings(loadingsRes.data);
-      setOrders(ordersRes.data.filter(order => order.status === 'Confirmed' || order.status === 'Loaded'));
+      setOrders(ordersRes.data.filter(order => ['Draft', 'Tentative', 'Confirmed', 'Loaded', 'Shipped'].includes(order.status)));
       setSkus(skusRes.data);
     } catch (error) {
       console.error('Error fetching data:', error);

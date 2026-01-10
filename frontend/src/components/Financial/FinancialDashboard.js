@@ -50,7 +50,7 @@ const FinancialDashboard = () => {
       setFinancial(financialRes.data);
       setFxRates(fxRes.data);
       setPayments(paymentsRes.data);
-      setOrders(ordersRes.data.filter(order => ['Confirmed', 'Loaded', 'Shipped', 'Delivered'].includes(order.status)));
+      setOrders(ordersRes.data.filter(order => ['Draft', 'Tentative', 'Confirmed', 'Loaded', 'Shipped', 'In Transit', 'Arrived', 'Delivered'].includes(order.status)));
     } catch (error) {
       console.error('Failed to fetch financial data:', error);
       if (error.response?.status === 403) {
