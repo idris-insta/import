@@ -12,7 +12,7 @@ import os
 import uuid
 from datetime import datetime, timedelta
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://cargomaster-2.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://freight-master-9.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "owner@icms.com"
