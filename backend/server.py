@@ -451,6 +451,12 @@ class ImportOrderCreate(BaseModel):
     currency: Currency
     items: List[ImportOrderItem]
     eta: Optional[datetime] = None
+    etd: Optional[datetime] = None
+    shipping_date: Optional[datetime] = None
+    container_number: Optional[str] = None
+    vessel_name: Optional[str] = None
+    bl_number: Optional[str] = None
+    total_packages: int = 0
     duty_rate: float = 0.1
     freight_charges: float = 0.0
     insurance_charges: float = 0.0
