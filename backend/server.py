@@ -2359,37 +2359,230 @@ async def get_dashboard_stats(current_user: User = Depends(check_permission(Perm
 
 @api_router.get("/dashboard/financial-overview")
 async def get_financial_overview(current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))):
+    """Get financial overview with actual data"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    payments = await db.payments.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    fx_rates = await db.fx_rates.find({}, {"_id": 0}).to_list(100)
+    
+    # Value in transit (orders that are shipped but not delivered)
+    value_in_transit = {}
+    for order in orders:
+        if order.get('status') in ['Shipped', 'In Transit', 'Arrived']:
+            curr = order.get('currency', 'USD')
+            if curr not in value_in_transit:
+                value_in_transit[curr] = {"count": 0, "value": 0}
+            value_in_transit[curr]["count"] += 1
+            value_in_transit[curr]["value"] += order.get('total_value', 0)
+    
+    # Payment summary
+    total_order_value = sum(o.get('total_value', 0) for o in orders if o.get('status') != 'Cancelled')
+    total_paid = sum(p.get('inr_amount', p.get('amount', 0)) for p in payments)
+    
+    payment_summary = {
+        "total_order_value": total_order_value,
+        "total_paid": total_paid,
+        "balance_due": total_order_value - total_paid,
+        "payment_count": len(payments)
+    }
+    
+    # FX Exposure
+    fx_exposure = {}
+    for order in orders:
+        if order.get('status') not in ['Delivered', 'Cancelled']:
+            curr = order.get('currency', 'USD')
+            if curr not in fx_exposure:
+                fx_exposure[curr] = {"orders": 0, "value": 0}
+            fx_exposure[curr]["orders"] += 1
+            fx_exposure[curr]["value"] += order.get('total_value', 0)
+    
+    # Supplier balances
+    supplier_balances = []
+    for supplier in suppliers:
+        supplier_orders = [o for o in orders if o.get('supplier_id') == supplier.get('id')]
+        supplier_payments = [p for p in payments if p.get('import_order_id') in [o.get('id') for o in supplier_orders]]
+        
+        total_order_val = sum(o.get('total_value', 0) for o in supplier_orders)
+        total_paid_val = sum(p.get('inr_amount', p.get('amount', 0)) for p in supplier_payments)
+        
+        supplier_balances.append({
+            "supplier_id": supplier.get('id'),
+            "supplier_name": supplier.get('name'),
+            "currency": supplier.get('base_currency'),
+            "total_orders": len(supplier_orders),
+            "total_value": total_order_val,
+            "total_paid": total_paid_val,
+            "balance": total_order_val - total_paid_val
+        })
+    
     return {
-        "value_in_transit": {},
-        "payment_summary": {},
-        "fx_exposure": {},
-        "supplier_balances": []
+        "value_in_transit": value_in_transit,
+        "payment_summary": payment_summary,
+        "fx_exposure": fx_exposure,
+        "supplier_balances": supplier_balances,
+        "fx_rates": {r.get('currency'): r.get('rate_to_inr') for r in fx_rates}
     }
 
 @api_router.get("/dashboard/logistics-overview")
 async def get_logistics_overview(current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))):
+    """Get logistics overview with container tracking"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    ports = await db.ports.find({}, {"_id": 0}).to_list(100)
+    port_map = {p['id']: p for p in ports}
+    
+    today = datetime.now(timezone.utc)
+    
+    # Container utilization by type
+    container_utilization = {}
+    for order in orders:
+        ct = order.get('container_type', 'Unknown')
+        if ct not in container_utilization:
+            container_utilization[ct] = {"count": 0, "total_utilization": 0, "avg_utilization": 0}
+        container_utilization[ct]["count"] += 1
+        container_utilization[ct]["total_utilization"] += order.get('utilization_percentage', 0)
+    
+    for ct in container_utilization:
+        if container_utilization[ct]["count"] > 0:
+            container_utilization[ct]["avg_utilization"] = container_utilization[ct]["total_utilization"] / container_utilization[ct]["count"]
+    
+    # Arriving soon (ETA within 7 days)
+    arriving_soon = []
+    for order in orders:
+        if order.get('status') in ['Shipped', 'In Transit']:
+            eta = order.get('eta')
+            if eta:
+                if isinstance(eta, str):
+                    try:
+                        eta = datetime.fromisoformat(eta.replace('Z', '+00:00'))
+                    except:
+                        continue
+                days_until = (eta - today).days
+                if 0 <= days_until <= 7:
+                    arriving_soon.append({
+                        "po_number": order.get('po_number'),
+                        "container_type": order.get('container_type'),
+                        "eta": eta.isoformat(),
+                        "days_until": days_until,
+                        "value": order.get('total_value', 0)
+                    })
+    
+    arriving_soon.sort(key=lambda x: x['days_until'])
+    
+    # Demurrage alerts
+    demurrage_alerts = []
+    for order in orders:
+        if order.get('status') == 'Arrived':
+            eta = order.get('eta')
+            port = port_map.get(order.get('port_id'), {})
+            free_days = port.get('demurrage_free_days', 7)
+            demurrage_rate = port.get('demurrage_rate', 50)
+            
+            if eta:
+                if isinstance(eta, str):
+                    try:
+                        eta = datetime.fromisoformat(eta.replace('Z', '+00:00'))
+                    except:
+                        continue
+                days_at_port = (today - eta).days
+                if days_at_port > free_days:
+                    demurrage_days = days_at_port - free_days
+                    demurrage_alerts.append({
+                        "po_number": order.get('po_number'),
+                        "days_at_port": days_at_port,
+                        "demurrage_days": demurrage_days,
+                        "estimated_cost": demurrage_days * demurrage_rate,
+                        "port": port.get('name', 'Unknown')
+                    })
+    
     return {
-        "container_utilization": {},
-        "arriving_soon": [],
-        "demurrage_alerts": [],
+        "container_utilization": container_utilization,
+        "arriving_soon": arriving_soon[:10],
+        "demurrage_alerts": demurrage_alerts,
         "port_performance": {}
     }
 
 @api_router.get("/dashboard/variance-analysis")
 async def get_variance_analysis(current_user: User = Depends(check_permission(Permission.VIEW_ANALYTICS.value))):
+    """Get variance analysis from actual loadings"""
+    loadings = await db.actual_loadings.find({}, {"_id": 0}).to_list(10000)
+    
+    # Summary
+    total_planned_qty = sum(l.get('total_planned_quantity', 0) for l in loadings)
+    total_actual_qty = sum(l.get('total_actual_quantity', 0) for l in loadings)
+    total_variance_qty = sum(l.get('total_variance_quantity', 0) for l in loadings)
+    total_variance_value = sum(l.get('total_variance_value', 0) for l in loadings)
+    
+    summary = {
+        "total_loadings": len(loadings),
+        "total_planned_quantity": total_planned_qty,
+        "total_actual_quantity": total_actual_qty,
+        "total_variance_quantity": total_variance_qty,
+        "total_variance_value": total_variance_value,
+        "variance_percentage": ((total_actual_qty - total_planned_qty) / total_planned_qty * 100) if total_planned_qty > 0 else 0
+    }
+    
     return {
-        "summary": {},
+        "summary": summary,
         "top_sku_variances": [],
         "trends": []
     }
 
 @api_router.get("/dashboard/cash-flow-forecast")
 async def get_cash_flow_forecast(current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))):
+    """Get cash flow forecast based on payment terms"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    payments = await db.payments.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    supplier_map = {s['id']: s for s in suppliers}
+    
+    today = datetime.now(timezone.utc)
+    forecast_days = 30
+    
+    # Calculate upcoming payments
+    supplier_payments = []
+    for order in orders:
+        if order.get('status') in ['Cancelled', 'Delivered']:
+            continue
+        
+        supplier = supplier_map.get(order.get('supplier_id'), {})
+        payment_terms_days = supplier.get('payment_terms_days', 30)
+        
+        # Get paid amount for this order
+        order_payments = [p for p in payments if p.get('import_order_id') == order.get('id')]
+        paid = sum(p.get('amount', 0) for p in order_payments)
+        balance = order.get('total_value', 0) - paid
+        
+        if balance <= 0:
+            continue
+        
+        # Calculate due date
+        base_date = order.get('shipping_date') or order.get('created_at')
+        if isinstance(base_date, str):
+            try:
+                base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
+            except:
+                base_date = today
+        
+        due_date = base_date + timedelta(days=payment_terms_days) if base_date else today
+        days_until = (due_date - today).days
+        
+        if days_until <= forecast_days:
+            supplier_payments.append({
+                "po_number": order.get('po_number'),
+                "supplier_name": supplier.get('name', 'Unknown'),
+                "amount_due": balance,
+                "currency": order.get('currency', 'USD'),
+                "due_date": due_date.isoformat(),
+                "days_until": days_until
+            })
+    
+    supplier_payments.sort(key=lambda x: x['days_until'])
+    
     return {
         "duty_forecasts": [],
         "demurrage_costs": [],
-        "supplier_payments": [],
-        "forecast_period": 30
+        "supplier_payments": supplier_payments,
+        "forecast_period": forecast_days
     }
 
 # Import Order endpoints
