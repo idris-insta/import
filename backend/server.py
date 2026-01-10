@@ -2870,6 +2870,149 @@ async def update_order_status(
     
     return {"message": f"Order status updated to {status}"}
 
+@api_router.put("/import-orders/{order_id}/tracking")
+async def update_order_tracking(
+    order_id: str,
+    container_number: Optional[str] = None,
+    vessel_name: Optional[str] = None,
+    bl_number: Optional[str] = None,
+    etd: Optional[datetime] = None,
+    eta: Optional[datetime] = None,
+    total_packages: Optional[int] = None,
+    current_user: User = Depends(check_permission(Permission.EDIT_ORDERS.value))
+):
+    """Update container tracking information"""
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if container_number is not None:
+        update_data["container_number"] = container_number
+    if vessel_name is not None:
+        update_data["vessel_name"] = vessel_name
+    if bl_number is not None:
+        update_data["bl_number"] = bl_number
+    if etd is not None:
+        update_data["etd"] = etd.isoformat()
+    if eta is not None:
+        update_data["eta"] = eta.isoformat()
+    if total_packages is not None:
+        update_data["total_packages"] = total_packages
+    
+    await db.import_orders.update_one({"id": order_id}, {"$set": update_data})
+    
+    updated = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    return updated
+
+@api_router.get("/reports/container-tracking")
+async def get_container_tracking_report(
+    current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))
+):
+    """Get detailed container tracking report with contents"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    skus = await db.skus.find({}, {"_id": 0}).to_list(10000)
+    
+    supplier_map = {s['id']: s for s in suppliers}
+    sku_map = {s['id']: s for s in skus}
+    
+    today = datetime.now(timezone.utc)
+    containers = []
+    
+    for order in orders:
+        # Get container contents
+        items_detail = []
+        total_packages = order.get('total_packages', 0)
+        
+        for item in order.get('items', []):
+            sku = sku_map.get(item.get('sku_id'), {})
+            items_detail.append({
+                "sku_code": sku.get('sku_code', 'N/A'),
+                "description": item.get('item_description') or sku.get('description', ''),
+                "quantity": item.get('quantity', 0),
+                "size": item.get('size', ''),
+                "adhesive_type": item.get('adhesive_type') or sku.get('adhesive_type', ''),
+                "liner_color": item.get('liner_color') or sku.get('liner_color', ''),
+                "unit_price": item.get('unit_price', 0),
+                "total_value": item.get('total_value', 0)
+            })
+        
+        supplier = supplier_map.get(order.get('supplier_id'), {})
+        
+        # Calculate days in transit/at port
+        eta = order.get('eta')
+        etd = order.get('etd')
+        days_info = {}
+        
+        if etd:
+            if isinstance(etd, str):
+                try:
+                    etd = datetime.fromisoformat(etd.replace('Z', '+00:00'))
+                except:
+                    etd = None
+            if etd:
+                days_since_departure = (today - etd).days
+                days_info["days_since_departure"] = max(0, days_since_departure)
+        
+        if eta:
+            if isinstance(eta, str):
+                try:
+                    eta = datetime.fromisoformat(eta.replace('Z', '+00:00'))
+                except:
+                    eta = None
+            if eta:
+                days_until_arrival = (eta - today).days
+                days_info["days_until_arrival"] = days_until_arrival
+                days_info["is_arrived"] = days_until_arrival <= 0
+        
+        containers.append({
+            "order_id": order.get('id'),
+            "po_number": order.get('po_number'),
+            "container_number": order.get('container_number') or f"CNT-{order.get('po_number', 'N/A')}",
+            "container_type": order.get('container_type'),
+            "status": order.get('status'),
+            "supplier_name": supplier.get('name', 'Unknown'),
+            "supplier_code": supplier.get('code', ''),
+            "vessel_name": order.get('vessel_name', ''),
+            "bl_number": order.get('bl_number', ''),
+            "etd": order.get('etd'),
+            "eta": order.get('eta'),
+            "shipping_date": order.get('shipping_date'),
+            "total_packages": total_packages or len(order.get('items', [])),
+            "total_items": len(order.get('items', [])),
+            "total_quantity": order.get('total_quantity', 0),
+            "total_weight": order.get('total_weight', 0),
+            "total_cbm": order.get('total_cbm', 0),
+            "total_value": order.get('total_value', 0),
+            "currency": order.get('currency', 'USD'),
+            "utilization_percentage": order.get('utilization_percentage', 0),
+            "items": items_detail,
+            **days_info
+        })
+    
+    # Group by status
+    by_status = {}
+    for c in containers:
+        status = c['status']
+        if status not in by_status:
+            by_status[status] = []
+        by_status[status].append(c)
+    
+    return {
+        "containers": containers,
+        "by_status": by_status,
+        "totals": {
+            "total_containers": len(containers),
+            "pending": len([c for c in containers if c['status'] in ['Draft', 'Tentative', 'Confirmed', 'Loaded']]),
+            "shipped": len([c for c in containers if c['status'] == 'Shipped']),
+            "in_transit": len([c for c in containers if c['status'] == 'In Transit']),
+            "arrived": len([c for c in containers if c['status'] == 'Arrived']),
+            "delivered": len([c for c in containers if c['status'] == 'Delivered'])
+        }
+    }
+
 # Actual Loading endpoints
 @api_router.post("/actual-loadings", response_model=ActualLoading)
 async def create_actual_loading(loading_data: ActualLoadingCreate, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
