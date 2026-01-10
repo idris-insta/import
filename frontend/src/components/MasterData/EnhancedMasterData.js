@@ -65,7 +65,9 @@ const EnhancedMasterData = () => {
     address: '',
     description: '',
     country: '',
-    opening_balance: ''
+    opening_balance: '',
+    payment_terms_days: '30',
+    payment_terms_type: 'NET'
   });
   
   const [portForm, setPortForm] = useState({
@@ -122,7 +124,7 @@ const EnhancedMasterData = () => {
 
   const resetForms = () => {
     setSkuForm({ sku_code: '', description: '', color: '', hsn_code: '', micron: '', width_mm: '', length_m: '', weight_per_unit: '', cbm_per_unit: '', unit_cost: '', category: '', adhesive_type: '', liner_color: '', shipping_mark: '', marking: '' });
-    setSupplierForm({ name: '', code: '', base_currency: '', contact_email: '', contact_phone: '', address: '', description: '', country: '', opening_balance: '' });
+    setSupplierForm({ name: '', code: '', base_currency: '', contact_email: '', contact_phone: '', address: '', description: '', country: '', opening_balance: '', payment_terms_days: '30', payment_terms_type: 'NET' });
     setPortForm({ name: '', code: '', country: '', transit_days: '', demurrage_free_days: '', demurrage_rate: '' });
     setContainerForm({ container_type: '', max_weight: '', max_cbm: '', freight_rate: '' });
     setEditingItem(null);
