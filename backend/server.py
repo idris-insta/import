@@ -426,7 +426,12 @@ class ImportOrder(BaseModel):
     utilization_percentage: float
     status: OrderStatus = OrderStatus.DRAFT
     eta: Optional[datetime] = None
+    etd: Optional[datetime] = None  # Estimated Time of Departure
     shipping_date: Optional[datetime] = None  # New field for shipment schedule
+    container_number: Optional[str] = None  # Container tracking number
+    vessel_name: Optional[str] = None  # Vessel/Ship name
+    bl_number: Optional[str] = None  # Bill of Lading number
+    total_packages: int = 0  # Total packages in container
     demurrage_start: Optional[datetime] = None
     customs_value: Optional[float] = None
     duty_rate: float = 0.1  # 10% default
