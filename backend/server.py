@@ -390,6 +390,9 @@ class ImportOrderItem(BaseModel):
     thickness: Optional[str] = None  # From PDF: "55 MIC", "200 MIC"
     size: Optional[str] = None  # From PDF: "500MM X 2000M"
     liner_color: Optional[str] = None  # From PDF: "AMBER", "DARK GREEN"
+    adhesive_type: Optional[str] = None  # New field
+    shipping_mark: Optional[str] = None  # New field
+    marking: Optional[str] = None  # From PDF: ORDER NO MARKING
     quantity: int
     qty_per_carton: Optional[int] = None  # From PDF: QTY/CTN
     total_cartons: Optional[int] = None  # From PDF: TOTAL CTN
@@ -400,7 +403,6 @@ class ImportOrderItem(BaseModel):
     kg_per_package: Optional[float] = None  # From PDF: KG PKG
     total_kg: Optional[float] = None  # From PDF: TOTAL KG
     code: Optional[str] = None  # From PDF: Product code like "IS-52314W-060TRHBWL"
-    marking: Optional[str] = None  # From PDF: ORDER NO MARKING
 
 class ImportOrder(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -418,6 +420,7 @@ class ImportOrder(BaseModel):
     utilization_percentage: float
     status: OrderStatus = OrderStatus.DRAFT
     eta: Optional[datetime] = None
+    shipping_date: Optional[datetime] = None  # New field for shipment schedule
     demurrage_start: Optional[datetime] = None
     customs_value: Optional[float] = None
     duty_rate: float = 0.1  # 10% default
