@@ -176,7 +176,24 @@ None - All reported issues have been resolved.
 
 ## Changelog
 
-### January 10, 2026
+### January 10, 2026 (Session 2)
+- Added comprehensive Reports & Analytics page with 4 tabs:
+  - **Supplier-wise:** Summary cards + supplier table with Ledger button
+  - **Container-wise:** Container type breakdown (pending/shipped/in-transit/delivered)
+  - **Payments:** Payments Made and Payments Due tables with overdue highlighting
+  - **Notifications:** Payment due alerts with severity levels (critical/high/medium)
+- Added Supplier Ledger dialog showing complete transaction history with running balance
+- Added Payment Terms to Supplier Master:
+  - Payment Type dropdown (NET, COD, ADVANCE, LC, TT)
+  - Payment Days input (default 30)
+- New backend APIs:
+  - `/api/reports/container-wise` - Container status breakdown
+  - `/api/reports/supplier-ledger/{id}` - Full supplier transaction ledger
+  - `/api/reports/payments-summary` - Payments made vs due
+  - `/api/reports/notifications` - Payment due alerts
+- Testing agent created pytest suite at `/app/tests/test_reports_features.py`
+
+### January 10, 2026 (Session 1)
 - Added System Settings page with 3 tabs (Company, Documents, Dropdowns)
 - Added new SKU fields: Category, Adhesive Type, Liner Color, Shipping Mark, Marking
 - Added Edit, Delete, Duplicate functionality to Purchase Orders
