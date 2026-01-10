@@ -1883,8 +1883,13 @@ async def export_order_to_pdf(
         ["Total Quantity:", f"{order.get('total_quantity', 0)}", "Total Weight:", f"{order.get('total_weight', 0):.2f} KG"],
         ["Total CBM:", f"{order.get('total_cbm', 0):.3f}", "Utilization:", f"{order.get('utilization_percentage', 0):.1f}%"],
         ["Goods Value:", f"{order.get('currency', 'USD')} {order.get('total_value', 0):.2f}", "Freight:", f"{order.get('currency', 'USD')} {order.get('freight_charges', 0):.2f}"],
-        ["Duty Rate:", f"{(order.get('duty_rate', 0) * 100):.1f}%", "Insurance:", f"{order.get('currency', 'USD')} {order.get('insurance_charges', 0):.2f}"],
     ]
+    
+    # Only show duty rate if enabled in settings
+    if settings.get('show_duty_rate_on_pdf', False):
+        summary_data.append(["Duty Rate:", f"{(order.get('duty_rate', 0) * 100):.1f}%", "Insurance:", f"{order.get('currency', 'USD')} {order.get('insurance_charges', 0):.2f}"])
+    else:
+        summary_data.append(["Insurance:", f"{order.get('currency', 'USD')} {order.get('insurance_charges', 0):.2f}", "", ""])
     
     summary_table = Table(summary_data, colWidths=[100, 140, 100, 140])
     summary_table.setStyle(TableStyle([
@@ -1896,6 +1901,12 @@ async def export_order_to_pdf(
         ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
     ]))
     elements.append(summary_table)
+    elements.append(Spacer(1, 20))
+    
+    # Footer
+    footer_text = settings.get('footer_text', '')
+    if footer_text:
+        elements.append(Paragraph(footer_text, normal_style))
     
     # Build PDF
     doc.build(elements)
