@@ -1783,6 +1783,371 @@ async def get_advanced_analytics(
         "top_suppliers": supplier_values[:10]
     }
 
+# ==================== COMPREHENSIVE REPORTS ====================
+
+@api_router.get("/reports/container-wise")
+async def get_container_wise_report(
+    current_user: User = Depends(check_permission(Permission.VIEW_DASHBOARD.value))
+):
+    """Get container-wise report with shipped, pending, and delivered breakdown"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    supplier_map = {s['id']: s for s in suppliers}
+    
+    # Group by container type and status
+    container_data = {}
+    for order in orders:
+        container_type = order.get('container_type', 'Unknown')
+        status = order.get('status', 'Unknown')
+        
+        if container_type not in container_data:
+            container_data[container_type] = {
+                "shipped": {"count": 0, "value": 0, "orders": []},
+                "pending": {"count": 0, "value": 0, "orders": []},
+                "delivered": {"count": 0, "value": 0, "orders": []},
+                "in_transit": {"count": 0, "value": 0, "orders": []}
+            }
+        
+        order_summary = {
+            "po_number": order.get('po_number'),
+            "supplier": supplier_map.get(order.get('supplier_id'), {}).get('name', 'Unknown'),
+            "value": order.get('total_value', 0),
+            "currency": order.get('currency', 'USD'),
+            "status": status,
+            "shipping_date": order.get('shipping_date'),
+            "eta": order.get('eta')
+        }
+        
+        if status in ['Shipped']:
+            container_data[container_type]["shipped"]["count"] += 1
+            container_data[container_type]["shipped"]["value"] += order.get('total_value', 0)
+            container_data[container_type]["shipped"]["orders"].append(order_summary)
+        elif status in ['Draft', 'Tentative', 'Confirmed', 'Loaded']:
+            container_data[container_type]["pending"]["count"] += 1
+            container_data[container_type]["pending"]["value"] += order.get('total_value', 0)
+            container_data[container_type]["pending"]["orders"].append(order_summary)
+        elif status in ['Delivered']:
+            container_data[container_type]["delivered"]["count"] += 1
+            container_data[container_type]["delivered"]["value"] += order.get('total_value', 0)
+            container_data[container_type]["delivered"]["orders"].append(order_summary)
+        elif status in ['In Transit', 'Arrived']:
+            container_data[container_type]["in_transit"]["count"] += 1
+            container_data[container_type]["in_transit"]["value"] += order.get('total_value', 0)
+            container_data[container_type]["in_transit"]["orders"].append(order_summary)
+    
+    # Calculate totals
+    totals = {
+        "total_shipped": sum(c["shipped"]["count"] for c in container_data.values()),
+        "total_pending": sum(c["pending"]["count"] for c in container_data.values()),
+        "total_delivered": sum(c["delivered"]["count"] for c in container_data.values()),
+        "total_in_transit": sum(c["in_transit"]["count"] for c in container_data.values()),
+        "shipped_value": sum(c["shipped"]["value"] for c in container_data.values()),
+        "pending_value": sum(c["pending"]["value"] for c in container_data.values()),
+        "delivered_value": sum(c["delivered"]["value"] for c in container_data.values()),
+        "in_transit_value": sum(c["in_transit"]["value"] for c in container_data.values())
+    }
+    
+    return {
+        "containers": container_data,
+        "totals": totals
+    }
+
+@api_router.get("/reports/supplier-ledger/{supplier_id}")
+async def get_supplier_ledger(
+    supplier_id: str,
+    current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))
+):
+    """Get detailed supplier ledger with all transactions"""
+    supplier = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    # Get all orders for this supplier
+    orders = await db.import_orders.find({"supplier_id": supplier_id}, {"_id": 0}).to_list(1000)
+    
+    # Get all payments for orders of this supplier
+    order_ids = [o['id'] for o in orders]
+    payments = await db.payments.find({"import_order_id": {"$in": order_ids}}, {"_id": 0}).to_list(1000)
+    
+    # Build ledger entries
+    ledger_entries = []
+    running_balance = supplier.get('opening_balance', 0)
+    
+    # Add opening balance entry
+    ledger_entries.append({
+        "date": supplier.get('created_at', datetime.now(timezone.utc).isoformat()),
+        "type": "opening_balance",
+        "reference": "Opening Balance",
+        "description": "Initial balance",
+        "debit": supplier.get('opening_balance', 0) if supplier.get('opening_balance', 0) > 0 else 0,
+        "credit": abs(supplier.get('opening_balance', 0)) if supplier.get('opening_balance', 0) < 0 else 0,
+        "balance": running_balance
+    })
+    
+    # Add orders as debits (we owe supplier)
+    for order in orders:
+        running_balance += order.get('total_value', 0)
+        ledger_entries.append({
+            "date": order.get('created_at', ''),
+            "type": "order",
+            "reference": order.get('po_number'),
+            "description": f"Purchase Order - {order.get('container_type')} - {order.get('status')}",
+            "debit": order.get('total_value', 0),
+            "credit": 0,
+            "balance": running_balance,
+            "order_id": order.get('id'),
+            "currency": order.get('currency', 'USD')
+        })
+    
+    # Add payments as credits (we paid supplier)
+    for payment in payments:
+        running_balance -= payment.get('inr_amount', payment.get('amount', 0))
+        ledger_entries.append({
+            "date": payment.get('payment_date', ''),
+            "type": "payment",
+            "reference": payment.get('reference', 'Payment'),
+            "description": f"Payment - {payment.get('currency', 'USD')} {payment.get('amount', 0)}",
+            "debit": 0,
+            "credit": payment.get('inr_amount', payment.get('amount', 0)),
+            "balance": running_balance,
+            "payment_id": payment.get('id'),
+            "original_amount": payment.get('amount', 0),
+            "original_currency": payment.get('currency', 'USD')
+        })
+    
+    # Sort by date
+    ledger_entries.sort(key=lambda x: x.get('date', ''))
+    
+    # Recalculate running balance after sorting
+    running_balance = 0
+    for entry in ledger_entries:
+        running_balance += entry.get('debit', 0) - entry.get('credit', 0)
+        entry['balance'] = running_balance
+    
+    return {
+        "supplier": {
+            "id": supplier.get('id'),
+            "name": supplier.get('name'),
+            "code": supplier.get('code'),
+            "currency": supplier.get('base_currency'),
+            "payment_terms_days": supplier.get('payment_terms_days', 30),
+            "payment_terms_type": supplier.get('payment_terms_type', 'NET')
+        },
+        "summary": {
+            "opening_balance": supplier.get('opening_balance', 0),
+            "total_orders": len(orders),
+            "total_order_value": sum(o.get('total_value', 0) for o in orders),
+            "total_payments": len(payments),
+            "total_paid": sum(p.get('inr_amount', p.get('amount', 0)) for p in payments),
+            "current_balance": running_balance
+        },
+        "ledger": ledger_entries
+    }
+
+@api_router.get("/reports/payments-summary")
+async def get_payments_summary(
+    current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))
+):
+    """Get comprehensive payments summary - made and due"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    payments = await db.payments.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    supplier_map = {s['id']: s for s in suppliers}
+    
+    # Calculate payments made
+    payments_made = []
+    for payment in payments:
+        order = next((o for o in orders if o.get('id') == payment.get('import_order_id')), None)
+        supplier = supplier_map.get(order.get('supplier_id') if order else None, {})
+        payments_made.append({
+            "payment_id": payment.get('id'),
+            "reference": payment.get('reference'),
+            "date": payment.get('payment_date'),
+            "po_number": order.get('po_number') if order else 'N/A',
+            "supplier_name": supplier.get('name', 'Unknown'),
+            "amount": payment.get('amount', 0),
+            "currency": payment.get('currency', 'USD'),
+            "inr_amount": payment.get('inr_amount', 0),
+            "payment_type": payment.get('payment_type', 'TT')
+        })
+    
+    # Calculate payments due based on payment terms
+    payments_due = []
+    today = datetime.now(timezone.utc)
+    
+    for order in orders:
+        if order.get('status') in ['Cancelled', 'Delivered']:
+            continue
+            
+        supplier = supplier_map.get(order.get('supplier_id'), {})
+        payment_terms_days = supplier.get('payment_terms_days', 30)
+        
+        # Get total paid for this order
+        order_payments = [p for p in payments if p.get('import_order_id') == order.get('id')]
+        total_paid = sum(p.get('inr_amount', p.get('amount', 0)) for p in order_payments)
+        
+        order_value = order.get('total_value', 0)
+        balance_due = order_value - total_paid
+        
+        if balance_due <= 0:
+            continue
+        
+        # Calculate due date based on shipping date or creation date
+        base_date = order.get('shipping_date') or order.get('created_at')
+        if isinstance(base_date, str):
+            try:
+                base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
+            except:
+                base_date = today
+        
+        due_date = base_date + timedelta(days=payment_terms_days) if base_date else today + timedelta(days=payment_terms_days)
+        days_overdue = (today - due_date).days if today > due_date else 0
+        days_until_due = (due_date - today).days if due_date > today else 0
+        
+        payments_due.append({
+            "order_id": order.get('id'),
+            "po_number": order.get('po_number'),
+            "supplier_id": supplier.get('id'),
+            "supplier_name": supplier.get('name', 'Unknown'),
+            "supplier_code": supplier.get('code', ''),
+            "order_value": order_value,
+            "paid_amount": total_paid,
+            "balance_due": balance_due,
+            "currency": order.get('currency', 'USD'),
+            "status": order.get('status'),
+            "due_date": due_date.isoformat() if due_date else None,
+            "days_overdue": days_overdue,
+            "days_until_due": days_until_due,
+            "is_overdue": days_overdue > 0,
+            "payment_terms": f"{supplier.get('payment_terms_type', 'NET')} {payment_terms_days}"
+        })
+    
+    # Sort payments due by overdue status and days
+    payments_due.sort(key=lambda x: (-x['days_overdue'], x['days_until_due']))
+    
+    # Summary stats
+    total_due = sum(p['balance_due'] for p in payments_due)
+    total_overdue = sum(p['balance_due'] for p in payments_due if p['is_overdue'])
+    total_paid = sum(p.get('inr_amount', 0) for p in payments)
+    
+    return {
+        "payments_made": {
+            "records": payments_made,
+            "total_count": len(payments_made),
+            "total_amount": total_paid
+        },
+        "payments_due": {
+            "records": payments_due,
+            "total_count": len(payments_due),
+            "total_due": total_due,
+            "overdue_count": len([p for p in payments_due if p['is_overdue']]),
+            "overdue_amount": total_overdue
+        },
+        "summary": {
+            "total_paid": total_paid,
+            "total_due": total_due,
+            "total_overdue": total_overdue,
+            "payments_count": len(payments_made),
+            "pending_orders_count": len(payments_due)
+        }
+    }
+
+@api_router.get("/reports/notifications")
+async def get_payment_notifications(
+    current_user: User = Depends(check_permission(Permission.VIEW_FINANCIALS.value))
+):
+    """Get payment due notifications and alerts"""
+    orders = await db.import_orders.find({}, {"_id": 0}).to_list(10000)
+    payments = await db.payments.find({}, {"_id": 0}).to_list(10000)
+    suppliers = await db.suppliers.find({}, {"_id": 0}).to_list(100)
+    supplier_map = {s['id']: s for s in suppliers}
+    
+    notifications = []
+    today = datetime.now(timezone.utc)
+    
+    for order in orders:
+        if order.get('status') in ['Cancelled', 'Delivered']:
+            continue
+            
+        supplier = supplier_map.get(order.get('supplier_id'), {})
+        payment_terms_days = supplier.get('payment_terms_days', 30)
+        
+        # Get total paid for this order
+        order_payments = [p for p in payments if p.get('import_order_id') == order.get('id')]
+        total_paid = sum(p.get('inr_amount', p.get('amount', 0)) for p in order_payments)
+        
+        order_value = order.get('total_value', 0)
+        balance_due = order_value - total_paid
+        
+        if balance_due <= 0:
+            continue
+        
+        # Calculate due date
+        base_date = order.get('shipping_date') or order.get('created_at')
+        if isinstance(base_date, str):
+            try:
+                base_date = datetime.fromisoformat(base_date.replace('Z', '+00:00'))
+            except:
+                base_date = today
+        
+        due_date = base_date + timedelta(days=payment_terms_days) if base_date else today + timedelta(days=payment_terms_days)
+        days_until_due = (due_date - today).days
+        
+        # Create notifications based on urgency
+        if days_until_due < 0:  # Overdue
+            notifications.append({
+                "type": "overdue",
+                "severity": "critical",
+                "title": f"OVERDUE: Payment for {order.get('po_number')}",
+                "message": f"Payment of {order.get('currency')} {balance_due:,.2f} to {supplier.get('name')} is {abs(days_until_due)} days overdue",
+                "po_number": order.get('po_number'),
+                "supplier_name": supplier.get('name'),
+                "amount": balance_due,
+                "currency": order.get('currency'),
+                "days_overdue": abs(days_until_due),
+                "due_date": due_date.isoformat()
+            })
+        elif days_until_due <= 3:  # Due in 3 days
+            notifications.append({
+                "type": "due_soon",
+                "severity": "high",
+                "title": f"URGENT: Payment due in {days_until_due} days",
+                "message": f"Payment of {order.get('currency')} {balance_due:,.2f} to {supplier.get('name')} for {order.get('po_number')}",
+                "po_number": order.get('po_number'),
+                "supplier_name": supplier.get('name'),
+                "amount": balance_due,
+                "currency": order.get('currency'),
+                "days_until_due": days_until_due,
+                "due_date": due_date.isoformat()
+            })
+        elif days_until_due <= 7:  # Due in a week
+            notifications.append({
+                "type": "upcoming",
+                "severity": "medium",
+                "title": f"Payment due in {days_until_due} days",
+                "message": f"Payment of {order.get('currency')} {balance_due:,.2f} to {supplier.get('name')} for {order.get('po_number')}",
+                "po_number": order.get('po_number'),
+                "supplier_name": supplier.get('name'),
+                "amount": balance_due,
+                "currency": order.get('currency'),
+                "days_until_due": days_until_due,
+                "due_date": due_date.isoformat()
+            })
+    
+    # Sort by severity
+    severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    notifications.sort(key=lambda x: severity_order.get(x['severity'], 99))
+    
+    return {
+        "notifications": notifications,
+        "counts": {
+            "critical": len([n for n in notifications if n['severity'] == 'critical']),
+            "high": len([n for n in notifications if n['severity'] == 'high']),
+            "medium": len([n for n in notifications if n['severity'] == 'medium']),
+            "total": len(notifications)
+        }
+    }
+
 # ==================== PURCHASE ORDER PDF EXPORT ====================
 
 @api_router.get("/import-orders/{order_id}/pdf")
