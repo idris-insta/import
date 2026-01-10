@@ -274,21 +274,29 @@ const EnhancedDashboard = () => {
 
         <TabsContent value="financial" className="space-y-6">
           {/* Financial KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <KPICard
               title="Value in Transit"
-              value={Object.values(financial?.value_in_transit || {}).reduce((a, b) => a + b, 0).toFixed(0)}
+              value={Object.values(financial?.value_in_transit || {}).reduce((a, b) => a + (b?.value || 0), 0).toLocaleString()}
               icon={Globe}
               color="stat-card blue"
+              description={`${Object.values(financial?.value_in_transit || {}).reduce((a, b) => a + (b?.count || 0), 0)} orders`}
               testId="kpi-transit-value"
             />
             <KPICard
-              title="Outstanding Payments"
-              value={financial?.supplier_balances?.length || 0}
+              title="Total Paid"
+              value={formatCurrency(financial?.payment_summary?.total_paid || 0, 'INR')}
+              icon={CheckCircle}
+              color="stat-card green"
+              description={`${financial?.payment_summary?.payment_count || 0} payments`}
+              testId="kpi-total-paid"
+            />
+            <KPICard
+              title="Balance Due"
+              value={formatCurrency(financial?.payment_summary?.balance_due || 0, 'USD')}
               icon={Clock}
               color="stat-card orange"
-              description="Suppliers with balance"
-              testId="kpi-outstanding-payments"
+              testId="kpi-balance-due"
             />
             <KPICard
               title="FX Exposure"
@@ -311,11 +319,52 @@ const EnhancedDashboard = () => {
                   <div key={currency} className="p-4 border rounded-lg">
                     <h4 className="font-medium text-lg mb-2">{currency}</h4>
                     <p className="text-2xl font-bold text-blue-600 mb-1">
-                      {formatCurrency(data.total_exposure, currency)}
+                      {formatCurrency(data?.value || 0, currency)}
                     </p>
-                    <p className="text-sm text-gray-600">{data.order_count} orders</p>
+                    <p className="text-sm text-gray-600">{data?.orders || 0} orders</p>
                   </div>
                 ))}
+                {Object.keys(financial?.fx_exposure || {}).length === 0 && (
+                  <div className="col-span-3 text-center py-4 text-gray-500">No active currency exposure</div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Supplier Balances */}
+          <Card className="card-hover" data-testid="supplier-balances-card">
+            <CardHeader>
+              <CardTitle>Supplier Balances</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-100">
+                      <th className="p-3 text-left">Supplier</th>
+                      <th className="p-3 text-center">Orders</th>
+                      <th className="p-3 text-right">Total Value</th>
+                      <th className="p-3 text-right">Paid</th>
+                      <th className="p-3 text-right">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financial?.supplier_balances?.map((supplier, idx) => (
+                      <tr key={idx} className="border-b hover:bg-slate-50">
+                        <td className="p-3 font-medium">{supplier.supplier_name}</td>
+                        <td className="p-3 text-center">{supplier.total_orders}</td>
+                        <td className="p-3 text-right">{formatCurrency(supplier.total_value, supplier.currency)}</td>
+                        <td className="p-3 text-right text-green-600">{formatCurrency(supplier.total_paid, 'INR')}</td>
+                        <td className={`p-3 text-right font-medium ${supplier.balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {formatCurrency(supplier.balance, supplier.currency)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(!financial?.supplier_balances || financial.supplier_balances.length === 0) && (
+                  <div className="text-center py-4 text-gray-500">No supplier balance data</div>
+                )}
               </div>
             </CardContent>
           </Card>
