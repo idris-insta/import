@@ -52,10 +52,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
   const checkAuth = async () => {
     const token = localStorage.getItem('icms_token');
     if (token) {
@@ -69,6 +65,10 @@ function App() {
     }
     setLoading(false);
   };
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
 
   const handleLogin = (userData, token) => {
     setUser(userData);
