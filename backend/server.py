@@ -1625,6 +1625,7 @@ async def get_supplier_wise_summary(
         total_paid = sum(p.get('amount', 0) for p in payments)
         
         summary.append({
+            "supplier_id": supplier.get('id'),
             "supplier_code": supplier.get('code'),
             "supplier_name": supplier.get('name'),
             "currency": supplier.get('base_currency'),
