@@ -11,7 +11,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { Plus, Edit, Package, Users, MapPin, Container, Loader2 } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const MasterData = () => {

@@ -10,7 +10,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { Plus, Package, Eye, Loader2, Download, Upload, FileSpreadsheet, FileText, X, Edit, Trash2, Copy, Search, Calendar } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const EnhancedImportOrders = () => {

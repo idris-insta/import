@@ -15,7 +15,7 @@ import {
   Clock, Calendar, Bell, CreditCard, Truck, Eye, Edit, Box, Anchor, MapPin
 } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const ReportsAnalytics = () => {

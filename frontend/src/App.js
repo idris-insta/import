@@ -15,7 +15,7 @@ import EnhancedSidebar from './components/Layout/EnhancedSidebar';
 import Header from './components/Layout/Header';
 import './App.css';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 // Setup axios interceptor for auth token

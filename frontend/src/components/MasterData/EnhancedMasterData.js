@@ -12,7 +12,7 @@ import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { Plus, Edit, Trash2, Package, Users, MapPin, Container, Loader2, Save, X, Download, Upload, FileSpreadsheet } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
 const EnhancedMasterData = () => {
