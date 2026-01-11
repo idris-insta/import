@@ -35,11 +35,8 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
       strictPort: true,
-      // Simplified HMR - let Vite auto-detect
-      hmr: true,
-      watch: {
-        usePolling: false,
-      },
+      // Disable HMR for stability in container environment
+      hmr: false,
     },
     
     preview: {
