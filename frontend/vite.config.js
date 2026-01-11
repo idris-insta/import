@@ -24,6 +24,30 @@ export default defineConfig(({ mode }) => {
       },
     },
     
+    // Configure esbuild to handle .js files as JSX
+    // This maintains backwards compatibility with CRA's behavior
+    esbuild: {
+      loader: 'jsx',
+      include: /src\/.*\.js$/,
+      exclude: [],
+    },
+    
+    // Optimize deps - tell Vite to process .js files containing JSX
+    optimizeDeps: {
+      esbuildOptions: {
+        loader: {
+          '.js': 'jsx',
+        },
+      },
+      include: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        'axios',
+        'lucide-react',
+      ],
+    },
+    
     // Development server configuration - replaces CRACO devServer
     server: {
       port: 3000,
@@ -84,27 +108,6 @@ export default defineConfig(({ mode }) => {
     define: {
       // Provide backwards compatibility for any remaining process.env usage
       'process.env': {},
-    },
-    
-    // Optimize dependencies
-    optimizeDeps: {
-      include: [
-        'react',
-        'react-dom',
-        'react-router-dom',
-        'axios',
-        'lucide-react',
-      ],
-      // Exclude large dependencies that should be bundled differently
-      exclude: [],
-    },
-    
-    // ESBuild configuration
-    esbuild: {
-      // Target modern JavaScript
-      target: 'es2020',
-      // Keep JSX for development (for debugging)
-      jsx: 'automatic',
     },
   };
 });
