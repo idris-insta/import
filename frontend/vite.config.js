@@ -35,8 +35,14 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
       strictPort: true,
-      // Disable HMR for stability in container environment
-      hmr: false,
+      // Configure HMR for proxy/container environment
+      // The client connects via wss to the external URL on port 443
+      hmr: {
+        host: env.VITE_BACKEND_URL ? new URL(env.VITE_BACKEND_URL).hostname : undefined,
+        port: 443,
+        protocol: 'wss',
+        clientPort: 443,
+      },
     },
     
     preview: {
