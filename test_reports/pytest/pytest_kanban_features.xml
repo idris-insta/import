@@ -1,28 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="9" skipped="0" tests="9" time="2.902" timestamp="2026-01-13T13:25:10.907241+00:00" hostname="agent-env-b596d1c9-2d70-4f59-aa25-3c2e30358257"><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_get_import_orders_for_kanban" time="0.311"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:39: in test_get_import_orders_for_kanban
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_update_order_status" time="0.278"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:63: in test_update_order_status
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_container_tracking_report" time="0.347"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:92: in test_container_tracking_report
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_container_wise_report" time="0.278"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:113: in test_container_wise_report
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_supplier_summary_report" time="0.273"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:123: in test_supplier_summary_report
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_payments_list" time="0.269"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:154: in test_payments_list
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_actual_loadings_list" time="0.314"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:162: in test_actual_loadings_list
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_documents_list" time="0.310"><failure message="assert 401 == 200&#10; +  where 401 = &lt;Response [401]&gt;.status_code">tests/test_kanban_features.py:170: in test_documents_list
-    assert response.status_code == 200
-E   assert 401 == 200
-E    +  where 401 = &lt;Response [401]&gt;.status_code</failure></testcase><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_financial_overview" time="0.272"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_kanban_features.py:178: in test_financial_overview
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="9" time="2.635" timestamp="2026-01-13T13:25:56.092326+00:00" hostname="agent-env-b596d1c9-2d70-4f59-aa25-3c2e30358257"><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_get_import_orders_for_kanban" time="0.304" /><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_update_order_status" time="0.292" /><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_container_tracking_report" time="0.271" /><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_container_wise_report" time="0.272" /><testcase classname="tests.test_kanban_features.TestKanbanFeatures" name="test_supplier_summary_report" time="0.276" /><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_payments_list" time="0.279" /><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_actual_loadings_list" time="0.316" /><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_documents_list" time="0.275" /><testcase classname="tests.test_kanban_features.TestPreviousFeatures" name="test_financial_overview" time="0.272"><failure message="assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">tests/test_kanban_features.py:178: in test_financial_overview
     assert response.status_code == 200
 E   assert 404 == 200
 E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase></testsuite></testsuites>
