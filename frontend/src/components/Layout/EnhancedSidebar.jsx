@@ -46,7 +46,7 @@ const EnhancedSidebar = ({ user }) => {
       permission: 'view_orders'
     },
     { 
-      name: 'Kanban Board', 
+      name: 'Container Status', 
       href: '/kanban', 
       icon: Columns, 
       testId: 'nav-kanban',
