@@ -21,6 +21,7 @@ const ActualLoading = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedLoading, setSelectedLoading] = useState(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editingLoading, setEditingLoading] = useState(null);
   
   const [loadingForm, setLoadingForm] = useState({
     import_order_id: '',
