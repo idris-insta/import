@@ -10,6 +10,7 @@ import ActualLoading from './components/ActualLoading/ActualLoading';
 import FinancialDashboard from './components/Financial/FinancialDashboard';
 import DocumentVault from './components/DocumentVault/DocumentVault';
 import ReportsAnalytics from './components/Reports/ReportsAnalytics';
+import ContainerKanban from './components/Kanban/ContainerKanban';
 import SystemSettings from './components/Settings/SystemSettings';
 import EnhancedSidebar from './components/Layout/EnhancedSidebar';
 import Header from './components/Layout/Header';
