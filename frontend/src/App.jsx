@@ -120,6 +120,7 @@ function App() {
                         <Route path="/financial" element={<FinancialDashboard />} />
                         <Route path="/documents" element={<DocumentVault />} />
                         <Route path="/reports" element={<ReportsAnalytics />} />
+                        <Route path="/kanban" element={<ContainerKanban />} />
                         <Route path="/settings" element={<SystemSettings />} />
                       </Routes>
                     </main>
