@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -10,8 +10,8 @@ import { Badge } from '../ui/badge';
 import { Textarea } from '../ui/textarea';
 import { toast } from 'sonner';
 import { 
-  Upload, FileText, Download, Trash2, Eye, Plus,
-  AlertTriangle, CheckCircle, Clock, FileCheck
+  Upload, FileText, Download, Trash2, Eye, Plus, Edit,
+  AlertTriangle, CheckCircle, Clock, FileCheck, Files, X
 } from 'lucide-react';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
