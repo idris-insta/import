@@ -716,18 +716,36 @@ const DocumentVault = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-600" />
-              Compliance Requirements
+              Document Checklist
             </CardTitle>
+            <p className="text-sm text-blue-600 mt-1">
+              ℹ️ Documents are <strong>NOT mandatory</strong>. Order can proceed to any status without documents.
+            </p>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {documentStatus && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-blue-800">
+                    Completeness: {documentStatus.completeness_percentage}%
+                  </span>
+                  <Badge className={documentStatus.completeness_percentage === 100 ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                    {documentStatus.status === 'complete' ? 'All Recommended Uploaded' : 'Some Recommended Missing'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-blue-600 mt-1">
+                  Order can proceed regardless of document status
+                </p>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                { type: 'Bill of Lading', required: true },
-                { type: 'Commercial Invoice', required: true },
-                { type: 'Packing List', required: true },
-                { type: 'Bill of Entry', required: true },
-                { type: 'Certificate', required: false },
-                { type: 'Other', required: false }
+                { type: 'Bill of Lading', recommended: true },
+                { type: 'Commercial Invoice', recommended: true },
+                { type: 'Packing List', recommended: true },
+                { type: 'Bill of Entry', recommended: false },
+                { type: 'Certificate', recommended: false },
+                { type: 'Other', recommended: false }
               ].map((req) => {
                 const hasDoc = documents.some(doc => doc.document_type === req.type);
                 const DocIcon = getDocumentIcon(req.type);
@@ -736,7 +754,7 @@ const DocumentVault = () => {
                     key={req.type} 
                     className={`p-4 border rounded-lg ${
                       hasDoc ? 'bg-green-50 border-green-200' : 
-                      req.required ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                      req.recommended ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50 border-gray-200'
                     }`}
                     data-testid={`compliance-${req.type.toLowerCase().replace(/\s+/g, '-')}`}
                   >
@@ -744,16 +762,19 @@ const DocumentVault = () => {
                       <DocIcon className={`w-5 h-5 ${getDocumentColor(req.type)}`} />
                       {hasDoc ? (
                         <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : req.required ? (
-                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                      ) : req.recommended ? (
+                        <Clock className="w-4 h-4 text-yellow-600" />
                       ) : (
                         <Clock className="w-4 h-4 text-gray-400" />
                       )}
                     </div>
                     <h4 className="font-medium text-sm mb-1">{req.type}</h4>
                     <p className="text-xs text-gray-600">
-                      {hasDoc ? 'Uploaded' : req.required ? 'Required' : 'Optional'}
+                      {hasDoc ? 'Uploaded' : req.recommended ? 'Recommended' : 'Optional'}
                     </p>
+                    {!hasDoc && (
+                      <p className="text-xs text-blue-500 mt-1">Not blocking</p>
+                    )}
                   </div>
                 );
               })}
