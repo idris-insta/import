@@ -653,6 +653,7 @@ const DocumentVault = () => {
                               variant="ghost"
                               size="sm"
                               onClick={() => window.open(`${BACKEND_URL}/uploads/${doc.filename}`, '_blank')}
+                              title="View"
                               data-testid={`view-doc-${doc.id}`}
                             >
                               <Eye className="w-4 h-4" />
@@ -666,6 +667,7 @@ const DocumentVault = () => {
                                 link.download = doc.original_filename;
                                 link.click();
                               }}
+                              title="Download"
                               data-testid={`download-doc-${doc.id}`}
                             >
                               <Download className="w-4 h-4" />
@@ -673,8 +675,18 @@ const DocumentVault = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => openEditDialog(doc)}
+                              title="Edit"
+                              data-testid={`edit-doc-${doc.id}`}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => deleteDocument(doc.id)}
                               className="text-red-600 hover:text-red-800"
+                              title="Delete"
                               data-testid={`delete-doc-${doc.id}`}
                             >
                               <Trash2 className="w-4 h-4" />
