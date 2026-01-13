@@ -255,6 +255,7 @@ const ActualLoading = () => {
                 <Select 
                   value={loadingForm.import_order_id} 
                   onValueChange={handleOrderSelect}
+                  disabled={!!editingLoading}
                 >
                   <SelectTrigger data-testid="order-select">
                     <SelectValue placeholder="Select an order" />
@@ -267,6 +268,9 @@ const ActualLoading = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                {editingLoading && (
+                  <p className="text-sm text-gray-500">Order cannot be changed when editing</p>
+                )}
               </div>
               
               {/* Items Table */}
