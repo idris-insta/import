@@ -236,17 +236,17 @@ const ActualLoading = () => {
           <h1 className="text-3xl font-bold text-gray-900">Actual Loading</h1>
           <p className="text-gray-600 mt-1">Record actual quantities vs planned and track variances</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) resetForm(); setDialogOpen(open); }}>
           <DialogTrigger asChild>
-            <Button data-testid="record-loading-btn">
+            <Button data-testid="record-loading-btn" onClick={() => { resetForm(); setDialogOpen(true); }}>
               <Plus className="w-4 h-4 mr-2" />
               Record Loading
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[80vh] overflow-y-auto" data-testid="loading-dialog">
             <DialogHeader>
-              <DialogTitle>Record Actual Loading</DialogTitle>
-              <DialogDescription>Enter actual quantities loaded vs planned quantities</DialogDescription>
+              <DialogTitle>{editingLoading ? 'Edit Actual Loading' : 'Record Actual Loading'}</DialogTitle>
+              <DialogDescription>{editingLoading ? 'Update actual quantities' : 'Enter actual quantities loaded vs planned quantities'}</DialogDescription>
             </DialogHeader>
             <div className="space-y-6 py-4">
               {/* Order Selection */}
