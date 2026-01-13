@@ -406,14 +406,40 @@ const ActualLoading = () => {
                         </Badge>
                       </td>
                       <td className="p-3">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewLoading(loading.id)}
-                          data-testid={`view-loading-${loading.id}`}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewLoading(loading.id)}
+                            title="View Details"
+                            data-testid={`view-loading-${loading.id}`}
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditLoading(loading)}
+                            title="Edit Loading"
+                            disabled={loading.is_locked}
+                            data-testid={`edit-loading-${loading.id}`}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const order = orders.find(o => o.id === loading.import_order_id);
+                              handleDeleteLoading(loading.id, order?.po_number || 'this record');
+                            }}
+                            title="Delete Loading"
+                            disabled={loading.is_locked}
+                            data-testid={`delete-loading-${loading.id}`}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
