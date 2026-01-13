@@ -335,12 +335,13 @@ const ActualLoading = () => {
               )}
             </div>
             <DialogFooter>
+              <Button variant="outline" onClick={() => { resetForm(); setDialogOpen(false); }}>Cancel</Button>
               <Button 
                 onClick={handleCreateLoading} 
                 disabled={!loadingForm.import_order_id || loadingForm.items.length === 0}
                 data-testid="save-loading-btn"
               >
-                Save Actual Loading
+                {editingLoading ? 'Update Loading' : 'Save Actual Loading'}
               </Button>
             </DialogFooter>
           </DialogContent>
