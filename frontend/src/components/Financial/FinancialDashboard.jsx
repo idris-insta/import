@@ -508,7 +508,7 @@ const FinancialDashboard = () => {
               {fxRates.length === 0 && (
                 <div className="text-center py-8">
                   <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600">No FX rates available. Click "Update FX Rates" to fetch latest rates.</p>
+                  <p className="text-gray-600">No FX rates available. Click &quot;Update FX Rates&quot; to fetch latest rates.</p>
                 </div>
               )}
             </CardContent>
