@@ -133,9 +133,108 @@ const DocumentVault = () => {
       await axios.delete(`${API}/documents/${documentId}`);
       toast.success('Document deleted successfully');
       await fetchDocuments();
+      await fetchDocumentStatus();
     } catch (error) {
       console.error('Failed to delete document:', error);
       toast.error('Failed to delete document');
+    }
+  };
+
+  const handleBatchFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setBatchFiles(files.map(file => ({
+      file,
+      type: 'Other',
+      notes: ''
+    })));
+  };
+
+  const updateBatchFile = (index, field, value) => {
+    setBatchFiles(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const removeBatchFile = (index) => {
+    setBatchFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadBatchDocuments = async () => {
+    if (batchFiles.length === 0 || !selectedOrder) {
+      toast.error('Please select files and an order');
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    
+    batchFiles.forEach(bf => {
+      formData.append('files', bf.file);
+    });
+    
+    formData.append('import_order_id', selectedOrder);
+    formData.append('document_types', JSON.stringify(batchFiles.map(bf => bf.type)));
+    formData.append('notes', JSON.stringify(batchFiles.map(bf => bf.notes)));
+
+    try {
+      const response = await axios.post(`${API}/documents/batch-upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      const result = response.data;
+      if (result.errors && result.errors.length > 0) {
+        toast.warning(`Uploaded ${result.uploaded.length} files. ${result.errors.length} errors.`);
+      } else {
+        toast.success(`${result.uploaded.length} documents uploaded successfully`);
+      }
+      
+      setBatchUploadDialogOpen(false);
+      setBatchFiles([]);
+      await fetchDocuments();
+      await fetchDocumentStatus();
+    } catch (error) {
+      console.error('Failed to upload documents:', error);
+      toast.error(error.response?.data?.detail || 'Failed to upload documents');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const openEditDialog = (doc) => {
+    setEditingDocument(doc);
+    setDocumentType(doc.document_type);
+    setNotes(doc.notes || '');
+    setEditDialogOpen(true);
+  };
+
+  const updateDocument = async () => {
+    if (!editingDocument) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('document_type', documentType);
+      formData.append('notes', notes);
+
+      await axios.put(`${API}/documents/${editingDocument.id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      toast.success('Document updated successfully');
+      setEditDialogOpen(false);
+      setEditingDocument(null);
+      setDocumentType('');
+      setNotes('');
+      await fetchDocuments();
+      await fetchDocumentStatus();
+    } catch (error) {
+      console.error('Failed to update document:', error);
+      toast.error(error.response?.data?.detail || 'Failed to update document');
     }
   };
 
