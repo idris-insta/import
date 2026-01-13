@@ -116,6 +116,7 @@ const DocumentVault = () => {
       setDocumentType('');
       setNotes('');
       await fetchDocuments();
+      await fetchDocumentStatus();
     } catch (error) {
       console.error('Failed to upload document:', error);
       toast.error(error.response?.data?.detail || 'Failed to upload document');
