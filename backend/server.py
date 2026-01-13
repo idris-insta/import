@@ -3402,6 +3402,203 @@ async def delete_document(document_id: str, current_user: User = Depends(check_p
         raise HTTPException(status_code=404, detail="Document not found")
     return {"message": "Document deleted successfully"}
 
+@api_router.put("/documents/{document_id}")
+async def update_document(
+    document_id: str,
+    document_type: str = Form(None),
+    notes: str = Form(None),
+    current_user: User = Depends(check_permission(Permission.MANAGE_DOCUMENTS.value))
+):
+    """Update document metadata (type and notes)"""
+    document = await db.documents.find_one({"id": document_id}, {"_id": 0})
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    update_data = {}
+    
+    if document_type:
+        try:
+            doc_type = DocumentType(document_type)
+            update_data['document_type'] = doc_type.value
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid document type. Must be one of: {[e.value for e in DocumentType]}")
+    
+    if notes is not None:
+        update_data['notes'] = notes
+    
+    if update_data:
+        await db.documents.update_one({"id": document_id}, {"$set": update_data})
+    
+    updated_doc = await db.documents.find_one({"id": document_id}, {"_id": 0})
+    return updated_doc
+
+@api_router.post("/documents/batch-upload")
+async def batch_upload_documents(
+    files: List[UploadFile] = File(...),
+    import_order_id: str = Form(...),
+    document_types: str = Form(None),  # JSON string array of document types
+    notes: str = Form(None),  # JSON string array of notes
+    current_user: User = Depends(check_permission(Permission.MANAGE_DOCUMENTS.value))
+):
+    """
+    Batch upload multiple documents for an import order.
+    Documents are NOT mandatory - order can proceed without them.
+    Status will be marked as 'incomplete' if expected documents are missing.
+    """
+    # Validate order exists
+    order = await db.import_orders.find_one({"id": import_order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    # Parse document types and notes if provided
+    doc_types_list = []
+    notes_list = []
+    if document_types:
+        try:
+            doc_types_list = json.loads(document_types)
+        except:
+            doc_types_list = []
+    
+    if notes:
+        try:
+            notes_list = json.loads(notes)
+        except:
+            notes_list = []
+    
+    uploaded_documents = []
+    errors = []
+    
+    for idx, file in enumerate(files):
+        try:
+            # Determine document type - use provided or default to 'Other'
+            doc_type_str = doc_types_list[idx] if idx < len(doc_types_list) else "Other"
+            try:
+                doc_type = DocumentType(doc_type_str)
+            except ValueError:
+                doc_type = DocumentType.OTHER
+            
+            # Get notes for this file
+            file_notes = notes_list[idx] if idx < len(notes_list) else None
+            
+            # Generate unique filename
+            file_ext = Path(file.filename).suffix
+            unique_filename = f"{uuid.uuid4()}{file_ext}"
+            file_path = UPLOADS_DIR / unique_filename
+            
+            # Save file
+            contents = await file.read()
+            with open(file_path, "wb") as buffer:
+                buffer.write(contents)
+            
+            # Get file size
+            file_size = file_path.stat().st_size
+            
+            document = {
+                "id": str(uuid.uuid4()),
+                "import_order_id": import_order_id,
+                "document_type": doc_type.value,
+                "filename": unique_filename,
+                "original_filename": file.filename,
+                "file_path": str(file_path),
+                "file_size": file_size,
+                "uploaded_by": current_user.id,
+                "uploaded_at": datetime.now(timezone.utc).isoformat(),
+                "notes": file_notes
+            }
+            
+            await db.documents.insert_one(document)
+            uploaded_documents.append({
+                "id": document["id"],
+                "filename": file.filename,
+                "type": doc_type.value,
+                "status": "uploaded"
+            })
+            
+        except Exception as e:
+            errors.append({
+                "filename": file.filename,
+                "error": str(e)
+            })
+    
+    # Calculate document completeness status
+    existing_docs = await db.documents.find({"import_order_id": import_order_id}, {"_id": 0, "document_type": 1}).to_list(100)
+    existing_types = set(d.get('document_type') for d in existing_docs)
+    
+    # Required document types for complete shipment (informational only - not blocking)
+    recommended_types = {"Bill of Lading", "Commercial Invoice", "Packing List"}
+    missing_types = recommended_types - existing_types
+    
+    completeness_status = "complete" if not missing_types else "incomplete"
+    
+    return {
+        "message": f"Batch upload completed. {len(uploaded_documents)} files uploaded, {len(errors)} errors.",
+        "uploaded": uploaded_documents,
+        "errors": errors,
+        "document_status": {
+            "completeness": completeness_status,
+            "existing_types": list(existing_types),
+            "missing_recommended": list(missing_types),
+            "note": "Documents are not mandatory. Order can proceed even with incomplete documentation."
+        }
+    }
+
+@api_router.get("/documents/status/{order_id}")
+async def get_document_status(order_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    """
+    Get document completeness status for an order.
+    Returns which documents are uploaded and which are recommended but missing.
+    Documents are NOT mandatory - just informational.
+    """
+    order = await db.import_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Import order not found")
+    
+    documents = await db.documents.find({"import_order_id": order_id}, {"_id": 0}).to_list(100)
+    
+    # Group documents by type
+    docs_by_type = {}
+    for doc in documents:
+        doc_type = doc.get('document_type', 'Other')
+        if doc_type not in docs_by_type:
+            docs_by_type[doc_type] = []
+        docs_by_type[doc_type].append({
+            "id": doc.get('id'),
+            "filename": doc.get('original_filename'),
+            "uploaded_at": doc.get('uploaded_at'),
+            "notes": doc.get('notes')
+        })
+    
+    # All document types and their status
+    all_doc_types = [e.value for e in DocumentType]
+    recommended_types = ["Bill of Lading", "Commercial Invoice", "Packing List"]
+    
+    document_checklist = []
+    for doc_type in all_doc_types:
+        has_docs = doc_type in docs_by_type
+        is_recommended = doc_type in recommended_types
+        document_checklist.append({
+            "type": doc_type,
+            "status": "uploaded" if has_docs else ("missing" if is_recommended else "optional"),
+            "is_recommended": is_recommended,
+            "is_mandatory": False,  # No documents are mandatory
+            "documents": docs_by_type.get(doc_type, [])
+        })
+    
+    # Calculate completeness
+    recommended_uploaded = sum(1 for dt in recommended_types if dt in docs_by_type)
+    completeness_percentage = (recommended_uploaded / len(recommended_types)) * 100 if recommended_types else 100
+    
+    return {
+        "order_id": order_id,
+        "po_number": order.get('po_number'),
+        "total_documents": len(documents),
+        "completeness_percentage": round(completeness_percentage, 1),
+        "status": "complete" if completeness_percentage == 100 else "incomplete",
+        "can_proceed": True,  # Always can proceed - documents not mandatory
+        "document_checklist": document_checklist,
+        "note": "Documents are informational only. Order can proceed to any status regardless of document completeness."
+    }
+
 # ==================== ENHANCED DASHBOARD ENDPOINTS ====================
 
 @api_router.get("/dashboard/demurrage-clock")
