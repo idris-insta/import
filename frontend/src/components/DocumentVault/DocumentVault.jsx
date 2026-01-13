@@ -285,14 +285,116 @@ const DocumentVault = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Document Vault</h1>
           <p className="text-gray-600 mt-1">Centralized document management for import orders</p>
+          <p className="text-sm text-blue-600 mt-1">📋 Documents are optional - orders can proceed without them</p>
         </div>
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={!selectedOrder} data-testid="upload-document-btn">
-              <Plus className="w-4 h-4 mr-2" />
-              Upload Document
-            </Button>
-          </DialogTrigger>
+        <div className="flex items-center gap-2">
+          {/* Batch Upload Dialog */}
+          <Dialog open={batchUploadDialogOpen} onOpenChange={setBatchUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" disabled={!selectedOrder} data-testid="batch-upload-btn">
+                <Files className="w-4 h-4 mr-2" />
+                Batch Upload
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto" data-testid="batch-upload-dialog">
+              <DialogHeader>
+                <DialogTitle>Batch Upload Documents</DialogTitle>
+                <DialogDescription>
+                  Upload multiple documents at once. Documents are NOT mandatory - order can proceed without them.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div>
+                  <Label htmlFor="batch-files">Select Files</Label>
+                  <Input
+                    id="batch-files"
+                    type="file"
+                    multiple
+                    ref={batchInputRef}
+                    onChange={handleBatchFileSelect}
+                    className="mt-2"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                    data-testid="batch-file-input"
+                  />
+                </div>
+                
+                {batchFiles.length > 0 && (
+                  <div className="space-y-3">
+                    <Label>Files to Upload ({batchFiles.length})</Label>
+                    {batchFiles.map((bf, index) => (
+                      <div key={index} className="p-3 border rounded-lg bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-600" />
+                            <span className="text-sm font-medium truncate max-w-[200px]">{bf.file.name}</span>
+                            <span className="text-xs text-gray-500">({formatFileSize(bf.file.size)})</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => removeBatchFile(index)}
+                            data-testid={`remove-batch-file-${index}`}
+                          >
+                            <X className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select 
+                            value={bf.type} 
+                            onValueChange={(val) => updateBatchFile(index, 'type', val)}
+                          >
+                            <SelectTrigger data-testid={`batch-type-${index}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {documentTypes.map((type) => (
+                                <SelectItem key={type.value} value={type.value}>
+                                  {type.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            placeholder="Notes (optional)"
+                            value={bf.notes}
+                            onChange={(e) => updateBatchFile(index, 'notes', e.target.value)}
+                            data-testid={`batch-notes-${index}`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setBatchFiles([]); setBatchUploadDialogOpen(false); }}>
+                  Cancel
+                </Button>
+                <Button onClick={uploadBatchDocuments} disabled={uploading || batchFiles.length === 0} data-testid="batch-upload-submit">
+                  {uploading ? (
+                    <>
+                      <Upload className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload {batchFiles.length} Files
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Single Upload Dialog */}
+          <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+            <DialogTrigger asChild>
+              <Button disabled={!selectedOrder} data-testid="upload-document-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Upload Document
+              </Button>
+            </DialogTrigger>
           <DialogContent data-testid="upload-dialog">
             <DialogHeader>
               <DialogTitle>Upload Document</DialogTitle>
