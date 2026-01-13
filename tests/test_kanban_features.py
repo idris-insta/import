@@ -177,7 +177,8 @@ class TestPreviousFeatures:
         response = self.session.get(f"{BASE_URL}/api/dashboard/financial-overview")
         assert response.status_code == 200
         data = response.json()
-        assert "total_order_value" in data
+        assert "payment_summary" in data
+        assert "supplier_balances" in data
         print(f"SUCCESS: Financial overview loaded")
 
 
