@@ -3159,6 +3159,59 @@ async def get_payments_by_supplier(supplier_id: str, current_user: User = Depend
             payment['payment_date'] = datetime.fromisoformat(payment['payment_date'])
     return payments
 
+@api_router.put("/payments/{payment_id}")
+async def update_payment(payment_id: str, payment_data: PaymentUpdate, current_user: User = Depends(check_permission(Permission.MANAGE_PAYMENTS.value))):
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    update_data = {}
+    old_amount = payment.get('amount', 0)
+    new_amount = old_amount
+    
+    # Handle import_order_id change
+    if payment_data.import_order_id and payment_data.import_order_id != payment.get('import_order_id'):
+        order = await db.import_orders.find_one({"id": payment_data.import_order_id}, {"_id": 0})
+        if not order:
+            raise HTTPException(status_code=404, detail="Import order not found")
+        update_data['import_order_id'] = payment_data.import_order_id
+        update_data['supplier_id'] = order['supplier_id']
+    
+    if payment_data.amount is not None:
+        new_amount = payment_data.amount
+        update_data['amount'] = new_amount
+        
+        # Recalculate INR amount with current or new FX rate
+        currency = payment_data.currency.value if payment_data.currency else payment.get('currency', 'USD')
+        fx_rate = await db.fx_rates.find_one({"from_currency": currency, "to_currency": "INR"}, {"_id": 0})
+        current_fx_rate = fx_rate['rate'] if fx_rate else 1.0
+        update_data['fx_rate'] = current_fx_rate
+        update_data['inr_amount'] = new_amount * current_fx_rate
+    
+    if payment_data.currency is not None:
+        update_data['currency'] = payment_data.currency.value
+    
+    if payment_data.payment_date is not None:
+        update_data['payment_date'] = payment_data.payment_date.isoformat()
+    
+    if payment_data.reference is not None:
+        update_data['reference'] = payment_data.reference
+    
+    if update_data:
+        # Adjust supplier balance (restore old, deduct new)
+        supplier_id = update_data.get('supplier_id', payment.get('supplier_id'))
+        amount_diff = new_amount - old_amount
+        if amount_diff != 0:
+            await db.suppliers.update_one(
+                {"id": supplier_id},
+                {"$inc": {"current_balance": -amount_diff}}
+            )
+        
+        await db.payments.update_one({"id": payment_id}, {"$set": update_data})
+    
+    updated_payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    return updated_payment
+
 @api_router.delete("/payments/{payment_id}")
 async def delete_payment(payment_id: str, current_user: User = Depends(check_permission(Permission.MANAGE_PAYMENTS.value))):
     payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
