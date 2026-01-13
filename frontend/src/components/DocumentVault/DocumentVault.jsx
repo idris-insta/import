@@ -50,6 +50,7 @@ const DocumentVault = () => {
   useEffect(() => {
     if (selectedOrder) {
       fetchDocuments();
+      fetchDocumentStatus();
     }
   }, [selectedOrder]);
 
@@ -72,6 +73,15 @@ const DocumentVault = () => {
     } catch (error) {
       console.error('Failed to fetch documents:', error);
       toast.error('Failed to load documents');
+    }
+  };
+
+  const fetchDocumentStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/documents/status/${selectedOrder}`);
+      setDocumentStatus(response.data);
+    } catch (error) {
+      console.error('Failed to fetch document status:', error);
     }
   };
 
