@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, DragOverlay, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -27,7 +27,7 @@ const KANBAN_COLUMNS = [
   { id: 'Delivered', title: 'Delivered', icon: CheckCircle, color: 'bg-green-50 border-green-300', headerColor: 'bg-green-500' }
 ];
 
-// Sortable container card component
+// Draggable container card component
 const ContainerCard = ({ container, onView }) => {
   const {
     attributes,
@@ -100,12 +100,21 @@ const ContainerCard = ({ container, onView }) => {
   );
 };
 
-// Kanban column component
+// Droppable Kanban column component
 const KanbanColumn = ({ column, containers, onView }) => {
   const Icon = column.icon;
   
+  // Make the column a droppable area
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.id,
+  });
+  
   return (
-    <div className={`flex flex-col min-w-[280px] max-w-[280px] rounded-lg border-2 ${column.color}`}>
+    <div 
+      ref={setNodeRef}
+      className={`flex flex-col min-w-[280px] max-w-[280px] rounded-lg border-2 ${column.color} ${isOver ? 'ring-2 ring-blue-500 bg-blue-50' : ''}`}
+      data-testid={`kanban-column-${column.id}`}
+    >
       <div className={`${column.headerColor} text-white p-3 rounded-t-md`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -128,7 +137,7 @@ const KanbanColumn = ({ column, containers, onView }) => {
         {containers.length === 0 && (
           <div className="text-center py-8 text-gray-400 text-xs">
             <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            No containers
+            Drop here
           </div>
         )}
       </div>
@@ -188,43 +197,54 @@ const ContainerKanban = () => {
     const { active, over } = event;
     setActiveContainer(null);
     
-    if (!over) return;
+    if (!over) {
+      console.log('No drop target');
+      return;
+    }
     
-    // Find which column the card was dropped on
+    console.log('Drag end - active:', active.id, 'over:', over.id);
+    
+    // Find the dragged container
     const draggedContainer = containers.find(c => c.id === active.id);
-    if (!draggedContainer) return;
+    if (!draggedContainer) {
+      console.log('Dragged container not found');
+      return;
+    }
     
-    // Determine target status from drop location
+    // Determine target status
     let targetStatus = null;
     
-    // Check if dropped on a column header or empty area
-    const overColumn = KANBAN_COLUMNS.find(col => col.id === over.id);
-    if (overColumn) {
-      targetStatus = overColumn.id;
+    // Check if dropped directly on a column (column id matches a status)
+    const isDroppedOnColumn = KANBAN_COLUMNS.some(col => col.id === over.id);
+    if (isDroppedOnColumn) {
+      targetStatus = over.id;
+      console.log('Dropped on column:', targetStatus);
     } else {
-      // Dropped on another card - find that card's column
+      // Dropped on another card - find that card's status
       const targetContainer = containers.find(c => c.id === over.id);
       if (targetContainer) {
         targetStatus = targetContainer.status;
+        console.log('Dropped on card, target status:', targetStatus);
       }
     }
     
-    if (!targetStatus || targetStatus === draggedContainer.status) return;
-    
-    // Validate status transition
-    const currentIndex = KANBAN_COLUMNS.findIndex(c => c.id === draggedContainer.status);
-    const targetIndex = KANBAN_COLUMNS.findIndex(c => c.id === targetStatus);
-    
-    // Allow forward movement and one step backward
-    if (targetIndex < currentIndex - 1) {
-      toast.warning('Cannot move container more than one step backward');
+    if (!targetStatus) {
+      console.log('Could not determine target status');
       return;
     }
+    
+    if (targetStatus === draggedContainer.status) {
+      console.log('Same status, no update needed');
+      return;
+    }
+    
+    console.log(`Moving from ${draggedContainer.status} to ${targetStatus}`);
     
     // Update status on server
     setUpdating(true);
     try {
-      await axios.put(`${API}/import-orders/${draggedContainer.id}/status?status=${targetStatus}`);
+      const response = await axios.put(`${API}/import-orders/${draggedContainer.id}/status?status=${encodeURIComponent(targetStatus)}`);
+      console.log('Status update response:', response.data);
       
       // Update local state
       setContainers(prev => prev.map(c => 
@@ -238,10 +258,6 @@ const ContainerKanban = () => {
     } finally {
       setUpdating(false);
     }
-  };
-
-  const handleDragOver = (event) => {
-    // This helps with dropping on columns
   };
 
   const handleViewContainer = (container) => {
@@ -258,7 +274,7 @@ const ContainerKanban = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
-        <span className="ml-2 text-gray-600">Loading Kanban board...</span>
+        <span className="ml-2 text-gray-600">Loading status board...</span>
       </div>
     );
   }
@@ -267,7 +283,7 @@ const ContainerKanban = () => {
     <div className="space-y-6 fade-in-up" data-testid="container-kanban">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Container Status Board</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Container Status</h1>
           <p className="text-sm text-gray-600 mt-1">Drag and drop containers to update their status</p>
         </div>
         <Button onClick={fetchContainers} variant="outline" disabled={loading || updating}>
@@ -279,15 +295,14 @@ const ContainerKanban = () => {
       <div className="bg-gray-100 p-4 rounded-lg">
         <div className="flex items-center gap-2 mb-4 text-sm text-gray-600">
           <AlertTriangle className="w-4 h-4 text-yellow-500" />
-          <span>Drag cards between columns to update container status. Forward movement is allowed, backward movement is limited to one step.</span>
+          <span>Drag cards to any column to update container status.</span>
         </div>
         
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCorners}
+          collisionDetection={closestCenter}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
         >
           <div className="flex gap-4 overflow-x-auto pb-4">
             {KANBAN_COLUMNS.map((column) => (
