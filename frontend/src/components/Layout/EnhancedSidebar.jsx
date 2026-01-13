@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Ship, Database, Package, TruckIcon, FileText, DollarSign, PieChart, Settings } from 'lucide-react';
+import { BarChart3, Ship, Database, Package, TruckIcon, FileText, DollarSign, PieChart, Settings, Columns } from 'lucide-react';
 
 const EnhancedSidebar = ({ user }) => {
   const location = useLocation();
@@ -43,6 +43,13 @@ const EnhancedSidebar = ({ user }) => {
       href: '/actual-loading', 
       icon: TruckIcon, 
       testId: 'nav-loading',
+      permission: 'view_orders'
+    },
+    { 
+      name: 'Kanban Board', 
+      href: '/kanban', 
+      icon: Columns, 
+      testId: 'nav-kanban',
       permission: 'view_orders'
     },
     { 
