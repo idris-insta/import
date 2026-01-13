@@ -119,19 +119,87 @@ const ActualLoading = () => {
     }
     
     try {
-      const response = await axios.post(`${API}/actual-loadings`, loadingForm);
-      setLoadings([...loadings, response.data]);
+      if (editingLoading) {
+        // Update existing loading
+        await axios.put(`${API}/actual-loadings/${editingLoading.id}`, {
+          items: loadingForm.items,
+          loading_date: loadingForm.loading_date || null
+        });
+        toast.success('Actual loading updated successfully');
+      } else {
+        // Create new loading
+        const response = await axios.post(`${API}/actual-loadings`, loadingForm);
+        setLoadings([...loadings, response.data]);
+        toast.success('Actual loading recorded successfully');
+      }
+      
       setLoadingForm({
         import_order_id: '',
         items: []
       });
+      setEditingLoading(null);
       setDialogOpen(false);
-      toast.success('Actual loading recorded successfully');
       fetchAllData(); // Refresh data
     } catch (error) {
-      console.error('Error creating loading:', error);
-      toast.error(error.response?.data?.detail || 'Failed to record actual loading');
+      console.error('Error saving loading:', error);
+      toast.error(error.response?.data?.detail || 'Failed to save actual loading');
     }
+  };
+
+  const handleEditLoading = (loadingRecord) => {
+    if (loadingRecord.is_locked) {
+      toast.error('Cannot edit locked loading record');
+      return;
+    }
+    
+    setEditingLoading(loadingRecord);
+    setLoadingForm({
+      import_order_id: loadingRecord.import_order_id,
+      items: loadingRecord.items.map(item => ({
+        ...item,
+        // Ensure all fields are present
+        sku_id: item.sku_id,
+        planned_quantity: item.planned_quantity,
+        actual_quantity: item.actual_quantity,
+        variance_quantity: item.variance_quantity,
+        planned_weight: item.planned_weight,
+        actual_weight: item.actual_weight,
+        variance_weight: item.variance_weight,
+        planned_value: item.planned_value,
+        actual_value: item.actual_value,
+        variance_value: item.variance_value
+      }))
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDeleteLoading = async (loadingId, poNumber) => {
+    const loadingRecord = loadings.find(l => l.id === loadingId);
+    if (loadingRecord?.is_locked) {
+      toast.error('Cannot delete locked loading record');
+      return;
+    }
+    
+    if (!window.confirm(`Are you sure you want to delete the loading record for "${poNumber}"?`)) {
+      return;
+    }
+    
+    try {
+      await axios.delete(`${API}/actual-loadings/${loadingId}`);
+      toast.success('Loading record deleted successfully');
+      fetchAllData();
+    } catch (error) {
+      console.error('Error deleting loading:', error);
+      toast.error(error.response?.data?.detail || 'Failed to delete loading record');
+    }
+  };
+
+  const resetForm = () => {
+    setLoadingForm({
+      import_order_id: '',
+      items: []
+    });
+    setEditingLoading(null);
   };
 
   const getVarianceColor = (variance) => {
