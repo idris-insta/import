@@ -3081,6 +3081,86 @@ async def get_actual_loadings(current_user: User = Depends(check_permission(Perm
             loading['loading_date'] = datetime.fromisoformat(loading['loading_date'])
     return loadings
 
+@api_router.get("/actual-loadings/{loading_id}")
+async def get_actual_loading(loading_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    loading = await db.actual_loadings.find_one({"id": loading_id}, {"_id": 0})
+    if not loading:
+        raise HTTPException(status_code=404, detail="Actual loading not found")
+    if isinstance(loading['created_at'], str):
+        loading['created_at'] = datetime.fromisoformat(loading['created_at'])
+    if loading.get('loading_date') and isinstance(loading['loading_date'], str):
+        loading['loading_date'] = datetime.fromisoformat(loading['loading_date'])
+    return loading
+
+@api_router.put("/actual-loadings/{loading_id}")
+async def update_actual_loading(loading_id: str, loading_data: ActualLoadingUpdate, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    loading = await db.actual_loadings.find_one({"id": loading_id}, {"_id": 0})
+    if not loading:
+        raise HTTPException(status_code=404, detail="Actual loading not found")
+    
+    if loading.get('is_locked'):
+        raise HTTPException(status_code=400, detail="Cannot update locked loading record")
+    
+    update_data = {}
+    
+    if loading_data.items is not None:
+        # Recalculate totals
+        items = [item.model_dump() for item in loading_data.items]
+        update_data['items'] = items
+        
+        total_planned_quantity = sum(item['planned_quantity'] for item in items)
+        total_actual_quantity = sum(item['actual_quantity'] for item in items)
+        total_variance_quantity = total_actual_quantity - total_planned_quantity
+        
+        total_planned_weight = sum(item['planned_weight'] for item in items)
+        total_actual_weight = sum(item['actual_weight'] for item in items)
+        total_variance_weight = total_actual_weight - total_planned_weight
+        
+        total_planned_value = sum(item['planned_value'] for item in items)
+        total_actual_value = sum(item['actual_value'] for item in items)
+        total_variance_value = total_actual_value - total_planned_value
+        
+        update_data.update({
+            'total_planned_quantity': total_planned_quantity,
+            'total_actual_quantity': total_actual_quantity,
+            'total_variance_quantity': total_variance_quantity,
+            'total_planned_weight': total_planned_weight,
+            'total_actual_weight': total_actual_weight,
+            'total_variance_weight': total_variance_weight,
+            'total_planned_value': total_planned_value,
+            'total_actual_value': total_actual_value,
+            'total_variance_value': total_variance_value
+        })
+    
+    if loading_data.loading_date is not None:
+        update_data['loading_date'] = loading_data.loading_date.isoformat()
+    
+    if update_data:
+        await db.actual_loadings.update_one({"id": loading_id}, {"$set": update_data})
+    
+    updated_loading = await db.actual_loadings.find_one({"id": loading_id}, {"_id": 0})
+    return updated_loading
+
+@api_router.delete("/actual-loadings/{loading_id}")
+async def delete_actual_loading(loading_id: str, current_user: User = Depends(check_permission(Permission.VIEW_ORDERS.value))):
+    loading = await db.actual_loadings.find_one({"id": loading_id}, {"_id": 0})
+    if not loading:
+        raise HTTPException(status_code=404, detail="Actual loading not found")
+    
+    if loading.get('is_locked'):
+        raise HTTPException(status_code=400, detail="Cannot delete locked loading record")
+    
+    # Optionally revert order status back to Confirmed
+    await db.import_orders.update_one(
+        {"id": loading['import_order_id'], "status": "Loaded"},
+        {"$set": {"status": "Confirmed"}}
+    )
+    
+    result = await db.actual_loadings.delete_one({"id": loading_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Actual loading not found")
+    return {"message": "Actual loading deleted successfully"}
+
 # ==================== PAYMENT ENDPOINTS ====================
 
 @api_router.post("/payments", response_model=Payment)
