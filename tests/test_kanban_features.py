@@ -173,8 +173,8 @@ class TestPreviousFeatures:
         print(f"SUCCESS: Documents list - {len(data)} documents")
     
     def test_financial_overview(self):
-        """Test GET /api/financial/overview - Financial dashboard"""
-        response = self.session.get(f"{BASE_URL}/api/financial/overview")
+        """Test GET /api/dashboard/financial-overview - Financial dashboard"""
+        response = self.session.get(f"{BASE_URL}/api/dashboard/financial-overview")
         assert response.status_code == 200
         data = response.json()
         assert "total_order_value" in data
