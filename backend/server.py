@@ -384,10 +384,6 @@ class PaymentUpdate(BaseModel):
     payment_date: Optional[datetime] = None
     reference: Optional[str] = None
 
-class ActualLoadingUpdate(BaseModel):
-    items: Optional[List[ActualLoadingItem]] = None
-    loading_date: Optional[datetime] = None
-
 class Document(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
