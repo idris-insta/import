@@ -377,6 +377,17 @@ class PaymentCreate(BaseModel):
     payment_date: datetime
     reference: str
 
+class PaymentUpdate(BaseModel):
+    import_order_id: Optional[str] = None
+    amount: Optional[float] = None
+    currency: Optional[Currency] = None
+    payment_date: Optional[datetime] = None
+    reference: Optional[str] = None
+
+class ActualLoadingUpdate(BaseModel):
+    items: Optional[List[ActualLoadingItem]] = None
+    loading_date: Optional[datetime] = None
+
 class Document(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
