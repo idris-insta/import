@@ -23,10 +23,16 @@ const DocumentVault = () => {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [batchUploadDialogOpen, setBatchUploadDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingDocument, setEditingDocument] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [batchFiles, setBatchFiles] = useState([]);
   const [documentType, setDocumentType] = useState('');
   const [notes, setNotes] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [documentStatus, setDocumentStatus] = useState(null);
+  const batchInputRef = useRef(null);
 
   const documentTypes = [
     { value: 'Bill of Lading', label: 'Bill of Lading', icon: FileText, color: 'text-blue-600' },
